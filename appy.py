@@ -3,19 +3,20 @@ import requests
 import json
 import os
 import time
-from datetime import datetime
 from collections import Counter
 
 # --- 1. CONFIGURATION API IGDB ---
 CLIENT_ID = '21ely20t5zzbxzby557r34oi16j4hh'
 CLIENT_SECRET = 'n0i3u05gs9gmknoho2sed9q3vfn1y3'
 DB_FILE = "data_comms.json"
-WISHLIST_FILE = "global_wishlists.json" # Pour stocker les votes de tout le monde
+WISHLIST_FILE = "global_wishlists.json"
 
 # --- 2. FONCTIONS SYSTÈME ---
 def charger_data(file):
     if os.path.exists(file):
-        with open(file, "r", encoding="utf-8") as f: return json.load(f)
+        try:
+            with open(file, "r", encoding="utf-8") as f: return json.load(f)
+        except: return []
     return []
 
 def sauver_data(file, data):
@@ -38,26 +39,23 @@ if 'comments' not in st.session_state: st.session_state.comments = charger_data(
 if 'global_w' not in st.session_state: st.session_state.global_w = charger_data(WISHLIST_FILE)
 if 'user_pseudo' not in st.session_state: st.session_state.user_pseudo = None
 if 'loaded' not in st.session_state: st.session_state.loaded = False
-if 'wishlist' not in st.session_state: st.session_state.wishlist = []
 if 'selected_game' not in st.session_state: st.session_state.selected_game = None
 if 'theme' not in st.session_state: st.session_state.theme = "#0072ce"
 
-# --- 4. DESIGN & ANIMATIONS ---
+# --- 4. DESIGN ---
 st.set_page_config(page_title="GameTrend Ultimate 2026", layout="wide")
-
 st.markdown(f"""
     <style>
     .stApp {{ background-color: #00051d; color: white; }}
-    #intro-screen {{ position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #00051d; display: flex; justify-content: center; align-items: center; z-index: 10000; animation: fadeOut 7s forwards; }}
+    #intro-screen {{ position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #00051d; display: flex; justify-content: center; align-items: center; z-index: 10000; animation: fadeOut 5s forwards; }}
     .logo-img {{ position: absolute; width: 300px; opacity: 0; transform: scale(0.8); }}
-    .ps {{ animation: seq 2s 0.5s forwards; z-index: 10001; }}
-    .xb {{ animation: seq 2s 2.7s forwards; z-index: 10002; }}
-    .nt {{ animation: seq 2s 4.9s forwards; z-index: 10003; }}
+    .ps {{ animation: seq 1.5s 0.5s forwards; }}
+    .xb {{ animation: seq 1.5s 2.0s forwards; }}
+    .nt {{ animation: seq 1.5s 3.5s forwards; }}
     @keyframes seq {{ 0% {{ opacity:0; }} 20%, 80% {{ opacity:1; }} 100% {{ opacity:0; }} }}
     @keyframes fadeOut {{ 0%, 96% {{ opacity:1; visibility:visible; }} 100% {{ opacity:0; visibility:hidden; }} }}
-    .msg-user {{ background: #001a3d; padding: 12px; border-radius: 10px; border-left: 5px solid {st.session_state.theme}; margin-top: 10px; }}
-    .news-ticker {{ background: {st.session_state.theme}; color: white; padding: 10px; font-weight: bold; overflow: hidden; white-space: nowrap; border-radius: 5px; margin-bottom: 20px; }}
-    .news-text {{ display: inline-block; padding-left: 100%; animation: ticker 30s linear infinite; }}
+    .news-ticker {{ background: {st.session_state.theme}; color: white; padding: 10px; font-weight: bold; overflow: hidden; border-radius: 5px; }}
+    .news-text {{ display: inline-block; padding-left: 100%; animation: ticker 25s linear infinite; }}
     @keyframes ticker {{ 0% {{ transform: translate(0, 0); }} 100% {{ transform: translate(-100%, 0); }} }}
     </style>
 """, unsafe_allow_html=True)
@@ -68,118 +66,52 @@ if not st.session_state.loaded:
         <img class="logo-img xb" src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_one_logo.svg/1024px-Xbox_one_logo.svg.png">
         <img class="logo-img nt" src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Nintendo_Switch_logo_logotype.png/800px-Nintendo_Switch_logo_logotype.png">
     </div>""", unsafe_allow_html=True)
-    time.sleep(7.2)
-    st.session_state.loaded = True
+    time.sleep(5.2); st.session_state.loaded = True
 
-st.markdown(f"""<div class="news-ticker"><div class="news-text">🚀 BIENVENUE EN 2026 SUR GAMETREND ULTIMATE -- GTA VI BAT TOUS LES RECORDS -- NINTENDO SWITCH 2 : RÉVÉLATION IMMINENTE -- </div></div>""", unsafe_allow_html=True)
+st.markdown(f"""<div class="news-ticker"><div class="news-text">🚀 TOP AAA & INDÉPENDANTS DISPONIBLES -- GTA VI EN TÊTE DES VOTES -- NOUVELLES PÉPITES INDÉES DÉCOUVERTES -- </div></div>""", unsafe_allow_html=True)
 
-# --- 5. SIDEBAR ---
-with st.sidebar:
-    st.title("⚙️ Paramètres")
-    color_choice = st.selectbox("Style Visuel", ["Néon Blue", "Cyber Red", "Emerald Green"])
-    st.session_state.theme = {"Néon Blue": "#0072ce", "Cyber Red": "#ff003c", "Emerald Green": "#00ff88"}[color_choice]
-    
-    st.divider()
-    admin_code = st.text_input("🔑 Code Admin", type="password")
-    is_admin = (admin_code == "1234")
-    
-    st.divider()
-    st.title("⭐ Ta Wishlist")
-    for g in st.session_state.wishlist: st.markdown(f"🎮 {g}")
-    if st.button("Vider ma liste"): st.session_state.wishlist = []; st.rerun()
-
-# --- 6. NAVIGATION DÉTAILS ---
+# --- 5. NAVIGATION DÉTAILS ---
 if st.session_state.selected_game:
     res = fetch_data(f"fields name, cover.url, summary, total_rating; where id = {st.session_state.selected_game};")
     if res:
         game = res[0]
         if st.button("⬅️ Retour"): st.session_state.selected_game = None; st.rerun()
-        col1, col2 = st.columns([1, 2])
-        with col1: 
-            img_url = "https:" + game['cover']['url'].replace('t_thumb', 't_720p') if 'cover' in game else "https://via.placeholder.com/720"
-            st.image(img_url, use_container_width=True)
-        with col2:
+        c1, c2 = st.columns([1, 2])
+        with c1: st.image("https:" + game['cover']['url'].replace('t_thumb', 't_720p'), use_container_width=True)
+        with c2:
             st.title(game['name'])
-            st.subheader(f"Note : ⭐ {round(game.get('total_rating', 0))}/100")
             st.write(game.get('summary', ''))
-            st.link_button("🎬 Trailer", f"https://www.youtube.com/results?search_query={game['name'].replace(' ', '+')}+official+trailer")
-            if st.button("❤️ Voter / Ajouter à la liste"):
-                if game['name'] not in st.session_state.wishlist: 
-                    st.session_state.wishlist.append(game['name'])
-                    st.session_state.global_w.append(game['name']) # On ajoute au compteur global
-                    sauver_data(WISHLIST_FILE, st.session_state.global_w)
-                    st.rerun()
+            if st.button("❤️ Voter pour ce jeu"):
+                st.session_state.global_w.append(game['name'])
+                sauver_data(WISHLIST_FILE, st.session_state.global_w); st.rerun()
     st.stop()
 
-# --- 7. HEADER & COMMUNAUTÉ ---
-h1, h2 = st.columns([3, 1])
-with h1: st.title("🎮 GameTrend Ultimate")
-with h2: ouvrir_comm = st.toggle("💬 Communauté")
+# --- 6. SECTIONS SPÉCIALES (AAA & INDÉ) ---
+st.title("🏆 Sélections Spéciales 2026")
 
-if ouvrir_comm:
-    for i, c in enumerate(st.session_state.comments):
-        cm, cd = st.columns([5, 1])
-        with cm:
-            st.markdown(f"<div class='msg-user'><b>{c['user']}</b>: {c['msg']}</div>", unsafe_allow_html=True)
-            if c.get('reply'): st.markdown(f"<div style='margin-left:30px; color:#ffcc00;'>↳ <b>Admin</b>: {c['reply']}</div>", unsafe_allow_html=True)
-        with cd:
-            if is_admin:
-                if st.button("❌", key=f"del_{i}"): st.session_state.comments.pop(i); sauver_data(DB_FILE, st.session_state.comments); st.rerun()
-                if not c.get('reply'):
-                    if st.button("💬", key=f"rep_{i}"): st.session_state[f"op_{i}"] = True
-        if st.session_state.get(f"op_{i}"):
-            r_txt = st.text_input("Ta réponse", key=f"in_{i}")
-            if st.button("Répondre", key=f"go_{i}"):
-                st.session_state.comments[i]['reply'] = r_txt; sauver_data(DB_FILE, st.session_state.comments); st.rerun()
-    if st.session_state.user_pseudo:
-        with st.form("msg"):
-            m = st.text_area(f"Message ({st.session_state.user_pseudo})")
-            if st.form_submit_button("Envoyer"):
-                st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m, "reply": None})
-                sauver_data(DB_FILE, st.session_state.comments); st.rerun()
-    else:
-        p = st.text_input("Choisis un pseudo")
-        if st.button("Rejoindre le forum"): st.session_state.user_pseudo = p; st.rerun()
-    st.divider()
+col_aaa, col_indie = st.tabs(["💎 TOP 12 - JEUX AAA", "🎨 TOP 12 - JEUX INDÉPENDANTS"])
 
-# --- 8. RECHERCHE ---
-st.subheader("🔎 Recherche")
-sc1, sc2 = st.columns(2)
-with sc1: q_search = st.text_input("Nom du jeu...")
-with sc2: q_style = st.text_input("Style...")
-
-if q_search:
-    res = fetch_data(f'search "{q_search}"; fields name, cover.url; where cover != null; limit 6;')
-    if res:
+with col_aaa:
+    # On filtre sur les gros budgets (excluant le tag indie) et score élevé
+    aaa_jeux = fetch_data("fields name, cover.url, total_rating; where genres != (32) & total_rating > 85 & cover != null; sort total_rating desc; limit 12;")
+    if aaa_jeux:
         cols = st.columns(6)
-        for i, g in enumerate(res):
-            with cols[i]:
-                st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                if st.button(f"{g['name'][:15]}", key=f"sh_{g['id']}"): st.session_state.selected_game = g['id']; st.rerun()
-
-# --- 9. LES PLUS APPRÉCIÉS PAR LA COMMUNAUTÉ (WISHLIST) ---
-st.divider()
-st.header("❤️ Coups de cœur de la Communauté")
-if st.session_state.global_w:
-    voted_games = Counter(st.session_state.global_w).most_common(12)
-    names = [v[0] for v in voted_games]
-    # On va chercher les images de ces jeux précis
-    formatted_names = '("' + '","'.join(names) + '")'
-    comm_jeux = fetch_data(f'fields name, cover.url; where name = {formatted_names} & cover != null; limit 12;')
-    
-    if comm_jeux:
-        cols = st.columns(6)
-        for i, g in enumerate(comm_jeux):
+        for i, g in enumerate(aaa_jeux):
             with cols[i % 6]:
-                img_url = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big')
-                st.image(img_url, use_container_width=True)
-                votes = Counter(st.session_state.global_w)[g['name']]
-                st.markdown(f"<small>🔥 {votes} votes</small>", unsafe_allow_html=True)
-                if st.button(f"Voir", key=f"comm_{g['id']}"): st.session_state.selected_game = g['id']; st.rerun()
-else:
-    st.write("Aucun vote pour le moment. Soyez le premier à ajouter un jeu en wishlist !")
+                st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+                if st.button(f"{g['name'][:18]}", key=f"aaa_{g['id']}"): st.session_state.selected_game = g['id']; st.rerun()
 
-# --- 10. CATALOGUE CLASSIQUE ---
+with col_indie:
+    # On filtre spécifiquement sur le tag Indie (ID: 32)
+    indie_jeux = fetch_data("fields name, cover.url, total_rating; where genres = (32) & total_rating > 80 & cover != null; sort total_rating desc; limit 12;")
+    if indie_jeux:
+        cols = st.columns(6)
+        for i, g in enumerate(indie_jeux):
+            with cols[i % 6]:
+                st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+                if st.button(f"{g['name'][:18]}", key=f"ind_{g['id']}"): st.session_state.selected_game = g['id']; st.rerun()
+
+# --- 7. CATALOGUES PAR PLATEFORME ---
 st.divider()
 platforms = {"PS5": 167, "Xbox Series": "169,49", "Switch": 130, "PC": 6}
 
@@ -187,21 +119,24 @@ for name, p_id in platforms.items():
     col_t1, col_t2 = st.columns([2, 1])
     with col_t1: st.header(f"🎮 {name}")
     with col_t2: 
-        tri = st.selectbox("Trier :", ["Mieux notés", "Plus récents", "Plus attendus"], key=f"tri_{name}")
+        tri = st.selectbox("Trier par :", ["Mieux notés", "Plus récents", "Plus aimés (Communauté)"], key=f"tri_{name}")
     
-    if tri == "Mieux notés":
-        query = f"fields name, cover.url, total_rating; where platforms = ({p_id}) & cover != null; sort total_rating desc; limit 12;"
-    elif tri == "Plus récents":
-        query = f"fields name, cover.url, first_release_date; where platforms = ({p_id}) & cover != null & first_release_date != null; sort first_release_date desc; limit 12;"
+    jeux = []
+    if tri == "Plus aimés (Communauté)":
+        voted_games = Counter(st.session_state.global_w).most_common(50)
+        names = [v[0] for v in voted_games]
+        if names:
+            formatted_names = '("' + '","'.join(names) + '")'
+            jeux = fetch_data(f'fields name, cover.url; where name = {formatted_names} & platforms = ({p_id}) & cover != null; limit 12;')
+    elif tri == "Mieux notés":
+        jeux = fetch_data(f"fields name, cover.url, total_rating; where platforms = ({p_id}) & cover != null; sort total_rating desc; limit 12;")
     else:
-        query = f"fields name, cover.url, hypes; where platforms = ({p_id}) & cover != null; sort hypes desc; limit 12;"
-    
-    jeux = fetch_data(query)
+        jeux = fetch_data(f"fields name, cover.url, first_release_date; where platforms = ({p_id}) & cover != null; sort first_release_date desc; limit 12;")
+
     if jeux:
         cols = st.columns(6)
         for i, g in enumerate(jeux):
             with cols[i % 6]:
-                img_url = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big') if 'cover' in g else "https://via.placeholder.com/150"
-                st.image(img_url, use_container_width=True)
+                st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
                 if st.button(f"{g['name'][:18]}", key=f"cat_{g['id']}_{name}"): st.session_state.selected_game = g['id']; st.rerun()
     st.divider()
