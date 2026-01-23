@@ -20,12 +20,12 @@ def fetch_games(platform_name):
     url = "https://api.igdb.com/v4/games"
     headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {token}'}
     
-    # ID mis à jour : Xbox Series (169) et ajout Xbox One (49) si besoin
+    # IDs : PC(6), PS5(167), Xbox Series + One(169,49), Switch(130)
     platforms = {"PC": 6, "PS5": 167, "Xbox Series": "169,49", "Switch": 130}
     p_id = platforms.get(platform_name)
     
-    # Requête élargie pour être sûr d'avoir 12 jeux même sans notes
-    query = f"fields name, cover.url; where platforms = ({p_id}) & cover != null; sort hypes desc; limit 12;"
+    # TRI PAR NOTE (total_rating) : On prend les 12 meilleurs scores
+    query = f"fields name, cover.url, total_rating; where platforms = ({p_id}) & cover != null & total_rating != null; sort total_rating desc; limit 12;"
     
     try:
         res = requests.post(url, headers=headers, data=query)
@@ -33,21 +33,18 @@ def fetch_games(platform_name):
     except: return []
 
 # --- INTERFACE ---
-st.set_page_config(page_title="GameTrend Ultra", layout="wide")
+st.set_page_config(page_title="GameTrend Top 12", layout="wide")
 
-# On garde ton intro incroyable (Ne pas toucher au script d'affichage)
+# On garde ton intro "Ultra" qui déchire
 st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
     #ultra-launch {
-        position: fixed;
-        top: 0; left: 0; width: 100%; height: 100%;
-        background-color: #00051d;
-        display: flex; justify-content: center; align-items: center;
-        z-index: 10000;
-        animation: fadeOut 5s forwards;
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: #00051d; display: flex; justify-content: center; align-items: center;
+        z-index: 10000; animation: fadeOut 5s forwards;
     }
-    .logo-anim { font-family: 'Arial Black', sans-serif; font-size: 50px; font-weight: 900; text-align: center; text-transform: uppercase; }
+    .logo-anim { font-family: 'Arial Black', sans-serif; font-size: 50px; font-weight: 900; text-align: center; }
     .logo-ps { color: #0072ce; text-shadow: 0 0 20px #0072ce; animation: show1 1s forwards; opacity: 0; }
     .logo-xbox { color: #107c10; text-shadow: 0 0 20px #107c10; animation: show2 2s forwards; opacity: 0; }
     .logo-switch { color: #e60012; text-shadow: 0 0 20px #e60012; animation: show3 3s forwards; opacity: 0; }
@@ -58,6 +55,7 @@ st.markdown("""
     @keyframes show4 { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
     @keyframes fadeOut { 0%, 90% { opacity: 1; visibility: visible; } 100% { opacity: 0; visibility: hidden; } }
     .cat-title { font-size: 28px; font-weight: bold; color: #0072ce; margin: 20px 0; border-bottom: 2px solid #0072ce; }
+    .rating-text { color: #ffcc00; font-weight: bold; font-size: 13px; }
     </style>
     <div id="ultra-launch">
         <div class="logo-anim">
@@ -73,9 +71,9 @@ if 'started' not in st.session_state:
     time.sleep(4.5)
     st.session_state['started'] = True
 
-st.title("🎮 PlayStation™ Store")
+st.title("🎮 Les 12 Meilleurs Jeux")
 
-# --- BOUCLE D'AFFICHAGE ---
+# --- AFFICHAGE ---
 for plateforme in ["PS5", "Xbox Series", "Switch", "PC"]:
     st.markdown(f'<div class="cat-title">{plateforme}</div>', unsafe_allow_html=True)
     jeux = fetch_games(plateforme)
@@ -86,5 +84,8 @@ for plateforme in ["PS5", "Xbox Series", "Switch", "PC"]:
             with cols[i % 6]:
                 img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big')
                 st.image(img, use_container_width=True)
-                st.markdown(f"<p style='font-size:12px;'><b>{g['name'][:15]}</b></p>", unsafe_allow_html=True)
+                st.markdown(f"**{g['name'][:15]}**")
+                # Affichage de la note en dessous
+                note = round(g.get('total_rating', 0))
+                st.markdown(f"<p class='rating-text'>⭐ {note}/100</p>", unsafe_allow_html=True)
     st.divider()
