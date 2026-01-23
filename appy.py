@@ -28,57 +28,65 @@ st.set_page_config(page_title="GameTrend", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
-    .msg-user { background: #001a3d; padding: 15px; border-radius: 10px; border-left: 5px solid #0072ce; margin-top: 10px; }
-    .msg-admin { background: #002b5c; padding: 15px; border-radius: 10px; border-left: 5px solid #ffcc00; margin-left: 40px; margin-top: 5px; color: #ffcc00; }
-    .titre-com { font-size: 24px; font-weight: bold; color: #0072ce; border-bottom: 2px solid #0072ce; margin-bottom: 20px; }
+    .msg-user { background: #001a3d; padding: 12px; border-radius: 10px; border-left: 5px solid #0072ce; margin-top: 10px; }
+    .msg-admin { background: #002b5c; padding: 12px; border-radius: 10px; border-left: 5px solid #ffcc00; margin-left: 30px; margin-top: 5px; color: #ffcc00; font-size: 0.9em; }
+    
+    /* Style pour le bouton en haut à droite */
+    .comm-button-container {
+        display: flex;
+        justify-content: flex-end;
+        padding: 10px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("GameTrend Pro")
+# --- HEADER AVEC BOUTON EN HAUT À DROITE ---
+header_col1, header_col2 = st.columns([3, 1])
 
-# --- NOUVEL ONGLET COMMENTAIRES (BIEN VISIBLE) ---
-st.markdown('<div class="titre-com">💬 Espace Communauté</div>', unsafe_allow_html=True)
+with header_col1:
+    st.title("GameTrend Pro")
 
-col_com1, col_com2 = st.columns([1, 2])
+with header_col2:
+    # C'est ici que se trouve ton bouton pour ouvrir l'espace
+    ouvrir_comm = st.toggle("💬 Espace Communauté")
 
-with col_com1:
-    st.subheader("Poste ton avis")
-    with st.form("publier_avis", clear_on_submit=True):
-        pseudo = st.text_input("Pseudo")
-        message = st.text_area("Message")
-        if st.form_submit_button("Envoyer"):
-            if pseudo and message:
-                st.session_state.comments.append({"user": pseudo, "msg": message, "reply": None})
-                sauver_comms(st.session_state.comments)
-                st.rerun()
+# --- L'ESPACE COMMUNAUTÉ (S'affiche seulement si activé) ---
+if ouvrir_comm:
+    st.markdown("### 👥 Discussion")
+    col_c1, col_c2 = st.columns([1, 2])
     
+    with col_c1:
+        st.write("**Poster un avis**")
+        with st.form("form_avis", clear_on_submit=True):
+            pseudo = st.text_input("Pseudo")
+            message = st.text_area("Message")
+            if st.form_submit_button("Envoyer"):
+                if pseudo and message:
+                    st.session_state.comments.append({"user": pseudo, "msg": message, "reply": None})
+                    sauver_comms(st.session_state.comments)
+                    st.rerun()
+        
+        st.divider()
+        code_admin = st.text_input("🔑 Code Admin (pour répondre)", type="password")
+        is_admin = (code_admin == "1234") # Code par défaut : 1234
+
+    with col_c2:
+        st.write("**Messages récents**")
+        for i, c in enumerate(reversed(st.session_state.comments)):
+            real_idx = len(st.session_state.comments) - 1 - i
+            st.markdown(f'<div class="msg-user"><b>{c["user"]}</b> : {c["msg"]}</div>', unsafe_allow_html=True)
+            
+            if c['reply']:
+                st.markdown(f'<div class="msg-admin"><b>Auteur</b> : {c["reply"]}</div>', unsafe_allow_html=True)
+            elif is_admin:
+                rep_text = st.text_input(f"Répondre à {c['user']}", key=f"ans_{real_idx}")
+                if st.button("Répondre", key=f"btn_{real_idx}"):
+                    st.session_state.comments[real_idx]['reply'] = rep_text
+                    sauver_comms(st.session_state.comments)
+                    st.rerun()
     st.divider()
-    # Zone Admin pour toi
-    code_admin = st.text_input("Code auteur (pour répondre)", type="password")
-    is_admin = (code_admin == "1234") # TON CODE ICI
 
-with col_com2:
-    st.subheader("Derniers messages")
-    if not st.session_state.comments:
-        st.write("Aucun commentaire pour le moment.")
-    
-    # On affiche les messages du plus récent au plus ancien
-    for i, c in enumerate(reversed(st.session_state.comments)):
-        real_idx = len(st.session_state.comments) - 1 - i
-        
-        st.markdown(f'<div class="msg-user"><b>{c["user"]}</b> :<br>{c["msg"]}</div>', unsafe_allow_html=True)
-        
-        if c['reply']:
-            st.markdown(f'<div class="msg-admin"><b>Réponse de l\'auteur</b> :<br>{c["reply"]}</div>', unsafe_allow_html=True)
-        elif is_admin:
-            # Champ de réponse direct sur le site
-            rep_text = st.text_input(f"Répondre à {c['user']}", key=f"ans_{real_idx}")
-            if st.button("Publier la réponse", key=f"btn_{real_idx}"):
-                st.session_state.comments[real_idx]['reply'] = rep_text
-                sauver_comms(st.session_state.comments)
-                st.rerun()
-
-st.divider()
-
-# --- LE RESTE DU SITE (CONSEILLER ET TOP 12) ---
-# ... (Tes requêtes IGDB et l'affichage des consoles ici)
+# --- RESTE DU SITE (CONSEILLER ET TOP 12) ---
+# Ton champ de recherche de style
+style_in = st.text_input("💡 Propose-moi des jeux dans le style de...")
+# ... (Code IGDB habituel pour afficher les jeux)
