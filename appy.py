@@ -117,3 +117,4 @@ if tops:
             st.image("https:" + game['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
             if st.button(game['name'][:15], key=f"t_{game['id']}"):
                 st.session_state.game = game['id']; st.rerun()
+
