@@ -70,16 +70,24 @@ if not st.session_state.loaded:
     </div>""", unsafe_allow_html=True)
     time.sleep(6.2); st.session_state.loaded = True
 
-st.markdown(f"""<div class="news-ticker"><div class="news-text">🚀 BIENVENUE SUR GAMETREND 2026 -- RÉPONDEZ AUX MESSAGES EN DIRECT -- GTA VI, SWITCH 2 -- </div></div>""", unsafe_allow_html=True)
+# --- 5. SIDEBAR ADMIN ---
+with st.sidebar:
+    st.title("🛡️ Panel Admin")
+    # MISE À JOUR DU CODE ICI
+    mon_code = st.text_input("Entrer le code secret", type="password")
+    c_est_moi = (mon_code == "628316")
+    if c_est_moi:
+        st.success("Mode Réponse Activé")
 
-# --- 5. ESPACE COMMUNAUTÉ (EN HAUT) ---
+# --- 6. FORUM (EN HAUT) ---
 st.title("🎮 GameTrend Ultimate")
+st.markdown(f"""<div class="news-ticker"><div class="news-text">🚀 BIENVENUE EN 2026 -- SEUL L'ADMIN PEUT RÉPONDRE AUX MESSAGES -- GTA VI, SWITCH 2 -- </div></div>""", unsafe_allow_html=True)
 
 st.subheader("💬 Communauté")
 if not st.session_state.user_pseudo:
-    c1, c2 = st.columns([3, 1])
-    with c1: p = st.text_input("Pseudo")
-    with c2: 
+    cp1, cp2 = st.columns([3, 1])
+    with cp1: p = st.text_input("Ton pseudo")
+    with cp2: 
         if st.button("Rejoindre"):
             if p: st.session_state.user_pseudo = p; st.rerun()
 else:
@@ -90,7 +98,7 @@ else:
                 st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m, "reply": None})
                 sauver_data(DB_FILE, st.session_state.comments); st.rerun()
 
-# Affichage des messages avec système de réponse "Style Script 3"
+# Affichage des messages
 for i, c in enumerate(st.session_state.comments[::-1]):
     idx = len(st.session_state.comments) - 1 - i
     col_msg, col_btn = st.columns([5, 1])
@@ -98,40 +106,39 @@ for i, c in enumerate(st.session_state.comments[::-1]):
     with col_msg:
         st.markdown(f"<div class='msg-user'><b>{c['user']}</b> : {c['msg']}</div>", unsafe_allow_html=True)
         if c.get('reply'):
-            st.markdown(f"<div class='reply-text'>↳ <b>{c.get('reply_user', 'Admin')}</b> : {c['reply']}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='reply-text'>↳ <b>Admin</b> : {c['reply']}</div>", unsafe_allow_html=True)
     
     with col_btn:
-        if st.session_state.user_pseudo and not c.get('reply'):
-            if st.button("💬", key=f"rep_btn_{idx}"):
-                st.session_state[f"active_rep_{idx}"] = True
+        # Seul toi avec le code 628316 peut voir ce bouton
+        if c_est_moi and not c.get('reply'):
+            if st.button("💬", key=f"rep_{idx}"):
+                st.session_state[f"show_rep_{idx}"] = True
 
-    if st.session_state.get(f"active_rep_{idx}"):
-        r_txt = st.text_input("Ta réponse...", key=f"in_{idx}")
-        if st.button("Répondre", key=f"go_{idx}"):
+    if st.session_state.get(f"show_rep_{idx}"):
+        r_txt = st.text_input("Ta réponse exclusive...", key=f"input_{idx}")
+        if st.button("Envoyer la réponse", key=f"send_{idx}"):
             st.session_state.comments[idx]['reply'] = r_txt
-            st.session_state.comments[idx]['reply_user'] = st.session_state.user_pseudo
             sauver_data(DB_FILE, st.session_state.comments)
-            del st.session_state[f"active_rep_{idx}"]
+            del st.session_state[f"show_rep_{idx}"]
             st.rerun()
 
 st.divider()
 
-# --- 6. CATALOGUE DES 12 ---
-# (Le reste du code des plateformes et du Top 12 reste le même)
+# --- 7. CATALOGUES ---
 platforms = {"PS5": 167, "Xbox": "169,49", "Switch": 130, "PC": 6}
 for name, p_id in platforms.items():
     st.header(f"🎮 {name}")
-    tri = st.selectbox("Type :", ["Mieux notés", "AAA", "Indés"], key=f"s_{name}")
+    tri = st.selectbox("Trier par :", ["Mieux notés", "AAA", "Indés"], key=f"tri_{name}")
     
     q = f"fields name, cover.url; where platforms = ({p_id}) & cover != null; sort total_rating desc; limit 12;"
     if tri == "AAA": q = f"fields name, cover.url; where platforms = ({p_id}) & genres != (32) & total_rating > 80 & cover != null; sort total_rating desc; limit 12;"
     elif tri == "Indés": q = f"fields name, cover.url; where platforms = ({p_id}) & genres = (32) & cover != null; sort total_rating desc; limit 12;"
     
-    data = fetch_data(q)
-    if data:
+    res_games = fetch_data(q)
+    if res_games:
         cols = st.columns(6)
-        for j, g in enumerate(data):
+        for j, g in enumerate(res_games):
             with cols[j % 6]:
                 st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                if st.button(g['name'][:18], key=f"g_{p_id}_{g['id']}"):
+                if st.button(g['name'][:18], key=f"btn_{p_id}_{g['id']}"):
                     st.session_state.selected_game = g['id']; st.rerun()
