@@ -21,13 +21,17 @@ def fetch_games(search_query=None, platform_name=None):
     headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {token}'}
     platforms = {"PC": 6, "PS5": 167, "Xbox Series": 169, "Switch": 130}
     
+    # On demande maintenant les genres aussi
+    fields = "fields name, cover.url, genres.name;"
+    
     if search_query:
-        query = f'fields name, cover.url; search "{search_query}"; limit 12;'
+        query = f'{fields} search "{search_query}"; limit 12;'
     elif platform_name:
         p_id = platforms.get(platform_name)
-        query = f'fields name, cover.url; where platforms = {p_id} & rating != null & cover != null; sort rating desc; limit 12;'
+        # On demande 12 jeux pour faire 2 lignes de 6
+        query = f'{fields} where platforms = {p_id} & rating != null & cover != null; sort rating desc; limit 12;'
     else:
-        query = 'fields name, cover.url; where rating > 80 & cover != null; sort rating desc; limit 12;'
+        query = f'{fields} where rating > 80 & cover != null; sort rating desc; limit 12;'
     
     try:
         response = requests.post(url, headers=headers, data=query)
@@ -36,33 +40,47 @@ def fetch_games(search_query=None, platform_name=None):
         return []
 
 # --- INTERFACE ---
-st.set_page_config(page_title="GameTrend", layout="wide")
+st.set_page_config(page_title="GameTrend Pro", layout="wide")
 
-st.title("🎮 Tendances Jeux Vidéo")
+# CSS pour réduire les marges et la taille du texte
+st.markdown("""
+    <style>
+    .stImage { border-radius: 10px; }
+    p { font-size: 12px !important; margin-bottom: 0px !important; }
+    h3 { font-size: 16px !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
+st.title("🎮 GameTrend : Les Tops")
+
 search = st.text_input("🔍 Rechercher un jeu...")
 
 if search:
     data = fetch_games(search_query=search)
-    # 6 colonnes pour que les résultats de recherche soient petits aussi
     cols = st.columns(6)
     for i, game in enumerate(data):
         with cols[i % 6]:
             if 'cover' in game:
                 img = "https:" + game['cover']['url'].replace('t_thumb', 't_cover_big')
                 st.image(img, use_container_width=True)
-            st.caption(game['name'])
+            st.write(f"**{game['name'][:20]}**")
 else:
     for plateforme in ["PS5", "Xbox Series", "Switch", "PC"]:
-        st.subheader(f"🔥 {plateforme}")
+        st.subheader(f"🔥 Top {plateforme}")
         jeux = fetch_games(platform_name=plateforme)
+        
         if jeux:
-            # ICI ON MET 6 COLONNES POUR RÉDUIRE LA TAILLE
+            # Affichage en grille de 6 colonnes
             cols = st.columns(6)
-            for i, game in enumerate(jeux[:6]):
-                with cols[i]:
+            for i, game in enumerate(jeux):
+                with cols[i % 6]: # Le modulo %6 permet de passer à la ligne suivante après 6 jeux
                     if 'cover' in game:
-                        # On utilise l'image format cover_big mais dans une colonne étroite
                         img = "https:" + game['cover']['url'].replace('t_thumb', 't_cover_big')
                         st.image(img, use_container_width=True)
-                    st.caption(game['name'])
+                    
+                    # Affichage du nom (court) et du genre
+                    st.write(f"**{game['name'][:18]}...**")
+                    if 'genres' in game:
+                        genre_name = game['genres'][0]['name'] # On prend le premier genre
+                        st.caption(f"🏷️ {genre_name}")
         st.divider()
