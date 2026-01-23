@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import time
 
-# --- CONFIGURATION ---
+# --- CONFIGURATION (Tes clés IGDB) ---
 CLIENT_ID = '21ely20t5zzbxzby557r34oi16j4hh'
 CLIENT_SECRET = 'n0i3u05gs9gmknoho2sed9q3vfn1y3'
 
@@ -21,81 +21,96 @@ def fetch_games(platform_name):
     headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {token}'}
     platforms = {"PC": 6, "PS5": 167, "Xbox Series": 169, "Switch": 130}
     p_id = platforms.get(platform_name)
-    query = f"fields name, cover.url, genres.name; where platforms = {p_id} & rating != null & cover != null; sort rating desc; limit 12;"
+    query = f"fields name, cover.url; where platforms = {p_id} & rating != null & cover != null; sort rating desc; limit 12;"
     try:
         res = requests.post(url, headers=headers, data=query)
         return res.json()
     except: return []
 
-# --- INTERFACE & ANIMATION ---
-st.set_page_config(page_title="GameTrend Pro", layout="wide")
+# --- INTERFACE ---
+st.set_page_config(page_title="GameTrend", layout="wide")
 
-# CSS : Le Splash Screen et le style Store
+# CSS pour l'animation de lancement (Défilement des consoles)
 st.markdown("""
     <style>
-    /* Fond noir profond */
     .stApp { background-color: #00051d; color: white; }
     
-    /* Animation de chargement */
-    #splash-screen {
+    /* Splash Screen avec défilement */
+    #intro-layer {
         position: fixed;
         top: 0; left: 0; width: 100%; height: 100%;
         background-color: #00051d;
         display: flex; justify-content: center; align-items: center;
         z-index: 9999;
-        animation: fadeOut 3s forwards;
+        animation: fadeOut 4s forwards;
     }
-    
+
+    .rolling-text {
+        font-family: 'Segoe UI', sans-serif;
+        font-size: 40px;
+        font-weight: bold;
+        color: #0072ce;
+        height: 50px;
+        overflow: hidden;
+    }
+
+    .rolling-text ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        animation: roll 3s steps(4) forwards;
+    }
+
+    .rolling-text li {
+        height: 50px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    @keyframes roll {
+        0% { transform: translateY(0); }
+        100% { transform: translateY(-200px); } /* Fait défiler les 4 noms */
+    }
+
     @keyframes fadeOut {
-        0% { opacity: 1; visibility: visible; }
-        80% { opacity: 1; }
+        0%, 80% { opacity: 1; visibility: visible; }
         100% { opacity: 0; visibility: hidden; }
     }
 
-    .loader-text {
-        font-family: 'Segoe UI', sans-serif;
-        font-size: 30px;
-        font-weight: bold;
-        color: #0072ce;
-        letter-spacing: 5px;
-        animation: pulse 1.5s infinite;
-    }
-
-    @keyframes pulse {
-        0% { transform: scale(1); opacity: 0.5; }
-        50% { transform: scale(1.1); opacity: 1; }
-        100% { transform: scale(1); opacity: 0.5; }
-    }
-    
-    h2 { color: #0072ce !important; border-bottom: 2px solid #0072ce; padding-bottom: 5px; }
+    h2 { color: #0072ce !important; border-left: 5px solid #0072ce; padding-left: 15px; }
     </style>
-    
-    <div id="splash-screen">
-        <div class="loader-text">GAMETREND...</div>
+
+    <div id="intro-layer">
+        <div class="rolling-text">
+            <ul>
+                <li>PLAYSTATION</li>
+                <li>XBOX</li>
+                <li>NINTENDO</li>
+                <li>PC MASTER RACE</li>
+            </ul>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-# Petite attente pour laisser l'animation respirer au premier lancement
-if 'loaded' not in st.session_state:
-    time.sleep(2.5)
-    st.session_state['loaded'] = True
+# Pause pour laisser l'intro finir proprement
+if 'init' not in st.session_state:
+    time.sleep(3.5)
+    st.session_state['init'] = True
 
 st.title("🎮 PlayStation™ Store")
 
-# --- LE CATALOGUE ---
+# --- AFFICHAGE DES JEUX ---
 for plateforme in ["PS5", "Xbox Series", "Switch", "PC"]:
     st.header(plateforme)
     jeux = fetch_games(plateforme)
     
     if jeux:
-        # Grille de 6 colonnes
         cols = st.columns(6)
-        for i, game in enumerate(jeux):
+        for i, g in enumerate(jeux):
             with cols[i % 6]:
-                if 'cover' in game:
-                    img = "https:" + game['cover']['url'].replace('t_thumb', 't_cover_big')
+                if 'cover' in g:
+                    img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big')
                     st.image(img, use_container_width=True)
-                st.write(f"**{game['name'][:15]}**")
-                if 'genres' in game:
-                    st.caption(game['genres'][0]['name'])
+                st.write(f"**{g['name'][:15]}**")
     st.divider()
