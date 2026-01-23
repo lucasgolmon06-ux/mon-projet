@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import time
 
-# --- CONFIGURATION (Tes clés IGDB) ---
+# --- CONFIGURATION ---
 CLIENT_ID = '21ely20t5zzbxzby557r34oi16j4hh'
 CLIENT_SECRET = 'n0i3u05gs9gmknoho2sed9q3vfn1y3'
 
@@ -28,89 +28,76 @@ def fetch_games(platform_name):
     except: return []
 
 # --- INTERFACE ---
-st.set_page_config(page_title="GameTrend", layout="wide")
+st.set_page_config(page_title="GameTrend Ultra", layout="wide")
 
-# CSS pour l'animation de lancement (Défilement des consoles)
 st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
     
-    /* Splash Screen avec défilement */
-    #intro-layer {
+    /* SPLASH SCREEN ULTRA LOGOS */
+    #ultra-launch {
         position: fixed;
         top: 0; left: 0; width: 100%; height: 100%;
         background-color: #00051d;
         display: flex; justify-content: center; align-items: center;
-        z-index: 9999;
-        animation: fadeOut 4s forwards;
+        z-index: 10000;
+        animation: fadeOut 5s forwards;
     }
 
-    .rolling-text {
-        font-family: 'Segoe UI', sans-serif;
-        font-size: 40px;
-        font-weight: bold;
-        color: #0072ce;
-        height: 50px;
-        overflow: hidden;
+    .logo-anim {
+        font-family: 'Arial Black', sans-serif;
+        font-size: 50px;
+        font-weight: 900;
+        text-align: center;
+        text-transform: uppercase;
     }
 
-    .rolling-text ul {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        animation: roll 3s steps(4) forwards;
-    }
+    /* Animation des noms avec effets de couleur néon */
+    .logo-ps { color: #0072ce; text-shadow: 0 0 20px #0072ce; animation: show1 1s forwards; opacity: 0; }
+    .logo-xbox { color: #107c10; text-shadow: 0 0 20px #107c10; animation: show2 2s forwards; opacity: 0; }
+    .logo-switch { color: #e60012; text-shadow: 0 0 20px #e60012; animation: show3 3s forwards; opacity: 0; }
+    .logo-final { color: white; text-shadow: 0 0 30px #ffffff; animation: show4 4s forwards; opacity: 0; }
 
-    .rolling-text li {
-        height: 50px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
-
-    @keyframes roll {
-        0% { transform: translateY(0); }
-        100% { transform: translateY(-200px); } /* Fait défiler les 4 noms */
-    }
+    @keyframes show1 { 0% { opacity: 0; transform: scale(0.5); } 100% { opacity: 1; transform: scale(1.2); } }
+    @keyframes show2 { 0% { opacity: 0; } 50% { opacity: 0; } 100% { opacity: 1; } }
+    @keyframes show3 { 0% { opacity: 0; } 66% { opacity: 0; } 100% { opacity: 1; } }
+    @keyframes show4 { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
 
     @keyframes fadeOut {
-        0%, 80% { opacity: 1; visibility: visible; }
+        0%, 90% { opacity: 1; visibility: visible; }
         100% { opacity: 0; visibility: hidden; }
     }
 
-    h2 { color: #0072ce !important; border-left: 5px solid #0072ce; padding-left: 15px; }
+    /* Style des Titres Sections */
+    .cat-title { font-size: 28px; font-weight: bold; color: #0072ce; margin: 20px 0; border-bottom: 2px solid #0072ce; }
     </style>
 
-    <div id="intro-layer">
-        <div class="rolling-text">
-            <ul>
-                <li>PLAYSTATION</li>
-                <li>XBOX</li>
-                <li>NINTENDO</li>
-                <li>PC MASTER RACE</li>
-            </ul>
+    <div id="ultra-launch">
+        <div class="logo-anim">
+            <div class="logo-ps">Sony PlayStation</div>
+            <div class="logo-xbox">Microsoft Xbox</div>
+            <div class="logo-switch">Nintendo Switch</div>
+            <div class="logo-final">GAMETREND UNLOCKED</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-# Pause pour laisser l'intro finir proprement
-if 'init' not in st.session_state:
-    time.sleep(3.5)
-    st.session_state['init'] = True
+# Attente pour l'intro
+if 'started' not in st.session_state:
+    time.sleep(4.5)
+    st.session_state['started'] = True
 
 st.title("🎮 PlayStation™ Store")
 
-# --- AFFICHAGE DES JEUX ---
 for plateforme in ["PS5", "Xbox Series", "Switch", "PC"]:
-    st.header(plateforme)
+    st.markdown(f'<div class="cat-title">{plateforme}</div>', unsafe_allow_html=True)
     jeux = fetch_games(plateforme)
     
     if jeux:
         cols = st.columns(6)
         for i, g in enumerate(jeux):
             with cols[i % 6]:
-                if 'cover' in g:
-                    img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big')
-                    st.image(img, use_container_width=True)
-                st.write(f"**{g['name'][:15]}**")
+                img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big')
+                st.image(img, use_container_width=True)
+                st.markdown(f"<p style='font-size:12px;'><b>{g['name'][:15]}</b></p>", unsafe_allow_html=True)
     st.divider()
