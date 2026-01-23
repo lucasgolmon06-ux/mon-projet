@@ -19,8 +19,11 @@ def sauver_comms(comms):
     with open(DB_FILE, "w", encoding="utf-8") as f:
         json.dump(comms, f, indent=4)
 
+# INITIALISATION DES VARIABLES DE SESSION
 if 'comments' not in st.session_state:
     st.session_state.comments = charger_comms()
+if 'user_pseudo' not in st.session_state:
+    st.session_state.user_pseudo = None
 
 @st.cache_data(ttl=3600)
 def get_access_token():
@@ -45,37 +48,20 @@ st.set_page_config(page_title="GameTrend Ultra", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
-    
-    /* Animation Intro Logos CORRIGÉE */
     #intro-screen {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background-color: #00051d; display: flex; justify-content: center; align-items: center;
         z-index: 10000; animation: fadeOut 6.5s forwards;
     }
     .logo-img { position: absolute; width: 250px; opacity: 0; transform: scale(0.8); }
-    
-    /* 1er Logo : PlayStation */
     .ps { animation: seq 1.8s 0.5s forwards; }
-    /* 2ème Logo : Xbox */
     .xb { animation: seq 1.8s 2.3s forwards; }
-    /* 3ème Logo : Nintendo (Celui-ci est maintenant bien calé) */
     .nt { animation: seq 1.8s 4.1s forwards; }
-
-    @keyframes seq { 
-        0% { opacity:0; transform:scale(0.8); } 
-        50% { opacity:1; transform:scale(1); } 
-        100% { opacity:0; transform:scale(1.1); } 
-    }
-    @keyframes fadeOut { 
-        0%, 95% { opacity:1; visibility:visible; } 
-        100% { opacity:0; visibility:hidden; } 
-    }
-
+    @keyframes seq { 0% { opacity:0; transform:scale(0.8); } 50% { opacity:1; transform:scale(1); } 100% { opacity:0; transform:scale(1.1); } }
+    @keyframes fadeOut { 0%, 95% { opacity:1; visibility:visible; } 100% { opacity:0; visibility:hidden; } }
     .msg-user { background: #001a3d; padding: 12px; border-radius: 10px; border-left: 5px solid #0072ce; margin-top: 10px; }
     .msg-admin { background: #002b5c; padding: 12px; border-radius: 10px; border-left: 5px solid #ffcc00; margin-left: 30px; margin-top: 5px; color: #ffcc00; }
-    .stImage:hover { transform: scale(1.05); transition: 0.3s; cursor: pointer; }
     </style>
-
     <div id="intro-screen">
         <img class="logo-img ps" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/PlayStation_logo.svg/1280px-PlayStation_logo.svg.png">
         <img class="logo-img xb" src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_one_logo.svg/1024px-Xbox_one_logo.svg.png">
@@ -83,7 +69,6 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# Augmentation du sleep pour laisser le 3ème logo apparaître
 if 'loaded' not in st.session_state:
     time.sleep(6.2)
     st.session_state['loaded'] = True
@@ -99,17 +84,32 @@ with h_col2:
 if ouvrir_comm:
     c1, c2 = st.columns([1, 2])
     with c1:
-        with st.form("f_comm", clear_on_submit=True):
-            p = st.text_input("Pseudo")
-            m = st.text_area("Message")
-            if st.form_submit_button("Envoyer"):
-                if p and m:
-                    st.session_state.comments.append({"user": p, "msg": m, "reply": None})
-                    sauver_comms(st.session_state.comments)
-                    st.rerun()
+        # SYSTÈME DE PSEUDO UNIQUE
+        if st.session_state.user_pseudo is None:
+            st.write("✨ **Choisis ton pseudo unique :**")
+            with st.form("set_pseudo"):
+                pseudo_input = st.text_input("Pseudo")
+                if st.form_submit_button("Valider le pseudo"):
+                    if pseudo_input:
+                        st.session_state.user_pseudo = pseudo_input
+                        st.rerun()
+        else:
+            st.success(f"Connecté en tant que : **{st.session_state.user_pseudo}**")
+            with st.form("f_comm", clear_on_submit=True):
+                m = st.text_area("Ton message")
+                if st.form_submit_button("Poster"):
+                    if m:
+                        st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m, "reply": None})
+                        sauver_comms(st.session_state.comments)
+                        st.rerun()
+            if st.button("Changer de pseudo"): # Optionnel : bouton pour réinitialiser
+                st.session_state.user_pseudo = None
+                st.rerun()
+
         st.divider()
         code_admin = st.text_input("🔑 Code Admin", type="password")
         is_admin = (code_admin == "1234")
+    
     with c2:
         for i, c in enumerate(reversed(st.session_state.comments)):
             idx = len(st.session_state.comments) - 1 - i
@@ -124,10 +124,9 @@ if ouvrir_comm:
                     st.rerun()
     st.divider()
 
-# --- RECHERCHE GLOBALE ---
-search_query = st.text_input("🔍 Rechercher un jeu précis...", placeholder="Ex: FIFA, GTA...")
+# --- RECHERCHE GLOBALE & CONSEILLER (Identiques à avant) ---
+search_query = st.text_input("🔍 Rechercher un jeu précis...")
 if search_query:
-    st.subheader(f"Résultats pour '{search_query}'")
     q_search = f'search "{search_query}"; fields name, cover.url, total_rating; where cover != null; limit 6;'
     res_search = fetch_data(q_search)
     if res_search:
@@ -138,10 +137,8 @@ if search_query:
                 st.caption(s['name'])
     st.divider()
 
-# --- CONSEILLER DE STYLE ---
 style_in = st.text_input("💡 Propose-moi des jeux dans le style de...")
 if style_in:
-    st.subheader(f"✨ Alternatives à {style_in}")
     q_style = f'search "{style_in}"; fields name, cover.url, total_rating; where cover != null & total_rating > 75 & name !~ *"{style_in}"*; limit 4;'
     res_style = fetch_data(q_style)
     if res_style:
@@ -152,7 +149,7 @@ if style_in:
                 st.caption(f"{s['name']} (⭐ {round(s['total_rating'])}/100)")
     st.divider()
 
-# --- TOP 12 ---
+# --- TOP 12 PAR CONSOLE ---
 platforms = {"PS5": 167, "Xbox Series": "169,49", "Switch": 130, "PC": 6}
 for name, p_id in platforms.items():
     st.header(f"Top 12 {name}")
@@ -165,4 +162,3 @@ for name, p_id in platforms.items():
                 st.markdown(f"**{g['name'][:15]}**")
                 st.markdown(f"<p style='color:#ffcc00;'>⭐ {round(g['total_rating'])}/100</p>", unsafe_allow_html=True)
     st.divider()
-
