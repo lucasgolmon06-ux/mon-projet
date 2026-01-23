@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-# --- CONFIGURATION PRIVÉE ---
+# --- CONFIGURATION ---
 CLIENT_ID = '21ely20t5zzbxzby557r34oi16j4hh'
 CLIENT_SECRET = 'n0i3u05gs9gmknoho2sed9q3vfn1y3'
 
@@ -20,77 +20,48 @@ def fetch_games(platform_name):
     headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {token}'}
     platforms = {"PC": 6, "PS5": 167, "Xbox Series": 169, "Switch": 130}
     p_id = platforms.get(platform_name)
-    query = f"fields name, cover.url; where platforms = {p_id} & rating != null & cover != null; sort rating desc; limit 12;"
+    query = f"fields name, cover.url, genres.name; where platforms = {p_id} & rating != null & cover != null; sort rating desc; limit 12;"
     try:
         res = requests.post(url, headers=headers, data=query)
         return res.json()
     except: return []
 
-# --- STYLE PS STORE ---
+# --- INTERFACE ---
 st.set_page_config(page_title="GameTrend", layout="wide")
 
+# CSS simple pour le fond et les titres
 st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
-    /* Masquer le menu Streamlit */
-    #MainMenu, footer, header {visibility: hidden;}
-    
-    .category-title {
-        font-size: 24px;
-        font-weight: bold;
-        color: #0072ce;
-        margin: 30px 0 10px 10px;
-        font-family: 'Segoe UI', sans-serif;
-    }
-
-    /* GRILLE : 3 colonnes sur mobile, 6 colonnes sur PC */
-    .game-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 15px;
-        padding: 10px;
-    }
-    @media (min-width: 1024px) {
-        .game-grid { grid-template-columns: repeat(6, 1fr); }
-    }
-
-    .card {
-        background: rgba(255,255,255,0.05);
-        padding: 5px;
-        border-radius: 10px;
-        text-align: center;
-        transition: 0.3s;
-    }
-    .card:hover { border: 1px solid #0072ce; transform: scale(1.02); }
-    .card img { width: 100%; border-radius: 8px; }
-    .card p {
-        font-size: 11px;
-        margin-top: 8px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        color: #e0e0e0;
-    }
+    h2 { color: #0072ce !important; font-size: 24px !important; }
+    .stCaption { color: #b0b0b0 !important; font-size: 10px !important; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🎮 GameTrend Store")
+st.title("🎮 PlayStation™ Store")
 
+# On boucle sur les consoles
 for plateforme in ["PS5", "Xbox Series", "Switch", "PC"]:
-    st.markdown(f'<div class="category-title">{plateforme}</div>', unsafe_allow_html=True)
+    st.header(plateforme)
     jeux = fetch_games(plateforme)
     
     if jeux:
-        html_content = '<div class="game-grid">'
-        for g in jeux:
-            img_url = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big')
-            html_content += f'''
-                <div class="card">
-                    <img src="{img_url}">
-                    <p>{g['name']}</p>
-                </div>
-            '''
-        html_content += '</div>'
-        st.markdown(html_content, unsafe_allow_html=True)
-
+        # On crée une grille de 6 colonnes (pour PC)
+        # Sur mobile, Streamlit va essayer de les réduire
+        cols = st.columns(6)
+        
+        for i, g in enumerate(jeux):
+            # On utilise le modulo % 6 pour remplir les 2 lignes (6 + 6 = 12)
+            with cols[i % 6]:
+                if 'cover' in g:
+                    img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big')
+                    st.image(img, use_container_width=True)
+                
+                # Nom du jeu en gras et petit
+                st.write(f"**{g['name'][:15]}**")
+                
+                # Genre en petit
+                if 'genres' in g:
+                    st.caption(g['genres'][0]['name'])
+    st.divider()
 
