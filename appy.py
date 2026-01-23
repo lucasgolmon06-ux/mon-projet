@@ -9,7 +9,6 @@ CLIENT_ID = '21ely20t5zzbxzby557r34oi16j4hh'
 CLIENT_SECRET = 'n0i3u05gs9gmknoho2sed9q3vfn1y3'
 DB_FILE = "data_comms.json"
 
-# --- SYSTÈME DE SAUVEGARDE DES COMMENTAIRES ---
 def charger_comms():
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r", encoding="utf-8") as f:
@@ -47,24 +46,33 @@ st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
     
-    /* Animation Intro Logos */
+    /* Animation Intro Logos CORRIGÉE */
     #intro-screen {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background-color: #00051d; display: flex; justify-content: center; align-items: center;
-        z-index: 10000; animation: fadeOut 5s forwards;
+        z-index: 10000; animation: fadeOut 6.5s forwards;
     }
     .logo-img { position: absolute; width: 250px; opacity: 0; transform: scale(0.8); }
-    .ps { animation: seq 1.5s 0.5s forwards; }
-    .xb { animation: seq 1.5s 2s forwards; }
-    .nt { animation: seq 1.5s 3.5s forwards; }
-    @keyframes seq { 0% { opacity:0; } 50% { opacity:1; transform:scale(1); } 100% { opacity:0; transform:scale(1.1); } }
-    @keyframes fadeOut { 0%, 90% { opacity:1; visibility:visible; } 100% { opacity:0; visibility:hidden; } }
+    
+    /* 1er Logo : PlayStation */
+    .ps { animation: seq 1.8s 0.5s forwards; }
+    /* 2ème Logo : Xbox */
+    .xb { animation: seq 1.8s 2.3s forwards; }
+    /* 3ème Logo : Nintendo (Celui-ci est maintenant bien calé) */
+    .nt { animation: seq 1.8s 4.1s forwards; }
 
-    /* Commentaires */
+    @keyframes seq { 
+        0% { opacity:0; transform:scale(0.8); } 
+        50% { opacity:1; transform:scale(1); } 
+        100% { opacity:0; transform:scale(1.1); } 
+    }
+    @keyframes fadeOut { 
+        0%, 95% { opacity:1; visibility:visible; } 
+        100% { opacity:0; visibility:hidden; } 
+    }
+
     .msg-user { background: #001a3d; padding: 12px; border-radius: 10px; border-left: 5px solid #0072ce; margin-top: 10px; }
     .msg-admin { background: #002b5c; padding: 12px; border-radius: 10px; border-left: 5px solid #ffcc00; margin-left: 30px; margin-top: 5px; color: #ffcc00; }
-    
-    /* Hover Images */
     .stImage:hover { transform: scale(1.05); transition: 0.3s; cursor: pointer; }
     </style>
 
@@ -75,8 +83,9 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
+# Augmentation du sleep pour laisser le 3ème logo apparaître
 if 'loaded' not in st.session_state:
-    time.sleep(5.0)
+    time.sleep(6.2)
     st.session_state['loaded'] = True
 
 # --- HEADER & BOUTON COMMUNAUTÉ ---
@@ -100,7 +109,7 @@ if ouvrir_comm:
                     st.rerun()
         st.divider()
         code_admin = st.text_input("🔑 Code Admin", type="password")
-        is_admin = (code_admin == "1234") # TON CODE ICI
+        is_admin = (code_admin == "1234")
     with c2:
         for i, c in enumerate(reversed(st.session_state.comments)):
             idx = len(st.session_state.comments) - 1 - i
@@ -115,21 +124,35 @@ if ouvrir_comm:
                     st.rerun()
     st.divider()
 
-# --- RECHERCHE DE STYLE ---
-style_in = st.text_input("💡 Propose-moi des jeux dans le style de...", placeholder="Ex: Cyberpunk, Elden Ring...")
+# --- RECHERCHE GLOBALE ---
+search_query = st.text_input("🔍 Rechercher un jeu précis...", placeholder="Ex: FIFA, GTA...")
+if search_query:
+    st.subheader(f"Résultats pour '{search_query}'")
+    q_search = f'search "{search_query}"; fields name, cover.url, total_rating; where cover != null; limit 6;'
+    res_search = fetch_data(q_search)
+    if res_search:
+        cols_s = st.columns(6)
+        for i, s in enumerate(res_search):
+            with cols_s[i]:
+                st.image("https:" + s['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+                st.caption(s['name'])
+    st.divider()
+
+# --- CONSEILLER DE STYLE ---
+style_in = st.text_input("💡 Propose-moi des jeux dans le style de...")
 if style_in:
-    st.subheader(f"Inspirés par {style_in}")
+    st.subheader(f"✨ Alternatives à {style_in}")
     q_style = f'search "{style_in}"; fields name, cover.url, total_rating; where cover != null & total_rating > 75 & name !~ *"{style_in}"*; limit 4;'
-    res = fetch_data(q_style)
-    if res:
-        cols = st.columns(4)
-        for i, s in enumerate(res):
-            with cols[i]:
+    res_style = fetch_data(q_style)
+    if res_style:
+        cols_st = st.columns(4)
+        for i, s in enumerate(res_style):
+            with cols_st[i]:
                 st.image("https:" + s['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
                 st.caption(f"{s['name']} (⭐ {round(s['total_rating'])}/100)")
     st.divider()
 
-# --- TOP 12 PAR CONSOLE ---
+# --- TOP 12 ---
 platforms = {"PS5": 167, "Xbox Series": "169,49", "Switch": 130, "PC": 6}
 for name, p_id in platforms.items():
     st.header(f"Top 12 {name}")
@@ -142,3 +165,4 @@ for name, p_id in platforms.items():
                 st.markdown(f"**{g['name'][:15]}**")
                 st.markdown(f"<p style='color:#ffcc00;'>⭐ {round(g['total_rating'])}/100</p>", unsafe_allow_html=True)
     st.divider()
+
