@@ -25,6 +25,7 @@ def fetch_games(platform_name=None, search_query=None):
         query = f'{fields} search "{search_query}"; limit 12;'
     else:
         p_id = platforms.get(platform_name)
+        # On récupère 12 jeux pour faire les 2 lignes
         query = f'{fields} where platforms = {p_id} & rating != null & cover != null; sort rating desc; limit 12;'
     
     try:
@@ -32,18 +33,22 @@ def fetch_games(platform_name=None, search_query=None):
         return res.json()
     except: return []
 
-# --- INTERFACE PROPRE ---
-st.set_page_config(page_title="PS Store", layout="wide")
+# --- INTERFACE ---
+st.set_page_config(page_title="PlayStation Store", layout="wide")
 
-# CSS pour le look PlayStation
+# CSS pour réduire la taille et supprimer les scripts visibles
 st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
-    .stTextInput input { background-color: #1a1f3d !important; color: white !important; border: 1px solid #0072ce !important; }
-    h2 { color: #ffffff !important; font-weight: bold !important; border-left: 5px solid #0072ce; padding-left: 15px; }
-    .stImage img { border-radius: 8px; }
-    /* Cache les messages de debug de Streamlit si besoin */
-    footer {visibility: hidden;}
+    /* Titres des catégories */
+    h2 { font-size: 20px !important; color: #0072ce !important; margin-top: 30px !important; }
+    /* Réduction de l'espace entre les colonnes */
+    div[data-testid="column"] { padding: 2px !important; }
+    /* Style des noms de jeux */
+    .game-name { font-size: 12px !important; font-weight: bold; margin-bottom: 0px; }
+    .game-genre { font-size: 10px !important; color: #b0b0b0; }
+    /* Arrondir les affiches */
+    .stImage img { border-radius: 6px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -52,38 +57,40 @@ search = st.text_input("", placeholder="🔍 Rechercher un jeu...")
 
 if search:
     jeux = fetch_games(search_query=search)
-    if jeux:
-        cols = st.columns(6)
-        for i, game in enumerate(jeux):
-            with cols[i % 6]:
-                if 'cover' in game:
-                    st.image("https:" + game['cover']['url'].replace('t_thumb', 't_cover_big'))
-                st.write(f"**{game['name'][:18]}**")
+    cols = st.columns(6)
+    for i, game in enumerate(jeux):
+        with cols[i % 6]:
+            if 'cover' in game:
+                st.image("https:" + game['cover']['url'].replace('t_thumb', 't_cover_big'))
+            st.caption(game['name'])
 else:
+    # Pour chaque console : 2 lignes de 6
     for plateforme in ["PS5", "Xbox Series", "Switch", "PC"]:
-        st.header(f"{plateforme}")
+        st.header(f"✨ {plateforme}")
         jeux = fetch_games(platform_name=plateforme)
         
         if jeux:
-            # Ligne 1
+            # LIGNE 1
             c1 = st.columns(6)
             for i in range(min(6, len(jeux))):
                 with c1[i]:
                     g = jeux[i]
-                    if 'cover' in g:
-                        st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                    st.write(f"**{g['name'][:15]}**")
-                    if 'genres' in g: st.caption(g['genres'][0]['name'])
+                    img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big') if 'cover' in g else ""
+                    st.image(img, use_container_width=True)
+                    st.markdown(f"<p class='game-name'>{g['name'][:15]}</p>", unsafe_allow_html=True)
+                    if 'genres' in g: 
+                        st.markdown(f"<p class='game-genre'>{g['genres'][0]['name']}</p>", unsafe_allow_html=True)
             
-            # Ligne 2
+            # LIGNE 2
             if len(jeux) > 6:
-                st.write("") # Petit espace entre les deux lignes
                 c2 = st.columns(6)
                 for i in range(6, min(12, len(jeux))):
                     with c2[i-6]:
                         g = jeux[i]
-                        if 'cover' in g:
-                            st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                        st.write(f"**{g['name'][:15]}**")
-                        if 'genres' in g: st.caption(g['genres'][0]['name'])
+                        img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big') if 'cover' in g else ""
+                        st.image(img, use_container_width=True)
+                        st.markdown(f"<p class='game-name'>{g['name'][:15]}</p>", unsafe_allow_html=True)
+                        if 'genres' in g: 
+                            st.markdown(f"<p class='game-genre'>{g['genres'][0]['name']}</p>", unsafe_allow_html=True)
         st.divider()
+
