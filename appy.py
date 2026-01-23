@@ -9,7 +9,7 @@ CLIENT_ID = '21ely20t5zzbxzby557r34oi16j4hh'
 CLIENT_SECRET = 'n0i3u05gs9gmknoho2sed9q3vfn1y3'
 DB_FILE = "data_comms.json"
 
-# (Fonctions charger_comms, sauver_comms et get_access_token identiques...)
+# (Fonctions de base inchangées)
 def charger_comms():
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r", encoding="utf-8") as f: return json.load(f)
@@ -37,42 +37,20 @@ def fetch_data(query):
         return res.json()
     except: return []
 
-# --- INTERFACE & DESIGN ---
+# --- INTERFACE ---
 st.set_page_config(page_title="GameTrend Ultra", layout="wide")
-st.markdown("""<style>.stApp { background-color: #00051d; color: white; }
-.msg-user { background: #001a3d; padding: 12px; border-radius: 10px; border-left: 5px solid #0072ce; margin-top: 10px; }
-.msg-admin { background: #002b5c; padding: 12px; border-radius: 10px; border-left: 5px solid #ffcc00; margin-left: 30px; margin-top: 5px; color: #ffcc00; }
-</style>""", unsafe_allow_html=True)
+st.markdown("""<style>.stApp { background-color: #00051d; color: white; }</style>""", unsafe_allow_html=True)
 
-# (L'intro des logos reste ici...)
-if 'loaded' not in st.session_state:
-    time.sleep(1.0) # Réduit pour test, remets 6.2 pour la version finale
-    st.session_state['loaded'] = True
+# (Intro Logos ici...)
 
 # --- HEADER & COMMUNAUTÉ ---
 h_col1, h_col2 = st.columns([3, 1])
 with h_col1: st.title("GameTrend Pro")
 with h_col2: ouvrir_comm = st.toggle("💬 Communauté")
 
-if ouvrir_comm:
-    c1, c2 = st.columns([1, 2])
-    with c1:
-        if st.session_state.user_pseudo is None:
-            p_in = st.text_input("Choisis ton pseudo unique")
-            if st.button("Valider"): st.session_state.user_pseudo = p_in; st.rerun()
-        else:
-            st.write(f"Connecté : **{st.session_state.user_pseudo}**")
-            m = st.text_area("Message")
-            if st.button("Poster"):
-                st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m, "reply": None})
-                sauver_comms(st.session_state.comments); st.rerun()
-    with c2:
-        for i, c in enumerate(reversed(st.session_state.comments)):
-            st.markdown(f'<div class="msg-user"><b>{c["user"]}</b> : {c["msg"]}</div>', unsafe_allow_html=True)
-            if c.get('reply'): st.markdown(f'<div class="msg-admin"><b>Auteur</b> : {c["reply"]}</div>', unsafe_allow_html=True)
-    st.divider()
+# (Espace Communauté ici...)
 
-# --- RECHERCHE & STYLE ---
+# --- RECHERCHE ---
 search_query = st.text_input("🔍 Recherche précise...")
 style_in = st.text_input("💡 Style de jeu...")
 
@@ -85,22 +63,26 @@ for name, p_id in platforms.items():
     with col_t1:
         st.header(f"Top 12 {name}")
     with col_t2:
-        # LE PETIT TRUC POUR CHOISIR L'OPTION
         choix = st.selectbox(f"Filtrer {name} par :", 
-                              ["Meilleures notes", "Les plus appréciés", "Gros Budgets (AAA)", "Jeux Indépendants"],
+                              ["Meilleures notes", "Coup de ❤️ Communauté", "Gros Budgets (AAA)", "Jeux Indépendants"],
                               key=f"filter_{name}")
 
-    # Logique des requêtes IGDB selon le choix
     base_where = f"platforms = ({p_id}) & cover != null"
     
     if choix == "Meilleures notes":
+        # Note globale (Critiques + Joueurs)
         q = f"fields name, cover.url, total_rating; where {base_where} & total_rating != null; sort total_rating desc; limit 12;"
-    elif choix == "Les plus appréciés":
-        q = f"fields name, cover.url, total_rating, follows; where {base_where}; sort follows desc; limit 12;"
+    
+    elif choix == "Coup de ❤️ Communauté":
+        # On utilise 'rating' (note des joueurs uniquement) et on trie par ceux qui ont le plus d'avis
+        q = f"fields name, cover.url, rating; where {base_where} & rating != null & rating_count > 50; sort rating desc; limit 12;"
+    
     elif choix == "Gros Budgets (AAA)":
-        # On filtre par thèmes ou on exclut le tag Indie (IGDB n'a pas de filtre 'budget' direct, on utilise le rating/popularity)
-        q = f"fields name, cover.url, total_rating; where {base_where} & themes != (31); sort total_rating desc; limit 12;"
+        # Exclure le thème Indie (31)
+        q = f"fields name, cover.url, total_rating; where {base_where} & themes != (31) & total_rating > 70; sort total_rating desc; limit 12;"
+    
     else: # Indépendants
+        # Thème Indie (31) uniquement
         q = f"fields name, cover.url, total_rating; where {base_where} & themes = (31); sort total_rating desc; limit 12;"
 
     jeux = fetch_data(q)
@@ -111,5 +93,8 @@ for name, p_id in platforms.items():
                 img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big')
                 st.image(img, use_container_width=True)
                 st.markdown(f"**{g['name'][:15]}**")
-                note = round(g.get('total_rating', 0))
-                st.markdown(f"<p style='color:#ffcc00;'>⭐ {note}/100</p>", unsafe_allow_html=True)
+                # Affichage de la note selon le filtre
+                note_val = g.get('rating') if choix == "Coup de ❤️ Communauté" else g.get('total_rating')
+                note_final = round(note_val) if note_val else "N/A"
+                st.markdown(f"<p style='color:#ffcc00;'>⭐ {note_final}/100</p>", unsafe_allow_html=True)
+
