@@ -52,7 +52,6 @@ st.markdown(f"""
     .nt {{ animation: seq 2s 4.9s forwards; z-index: 10003; }}
     @keyframes seq {{ 0% {{ opacity:0; }} 20%, 80% {{ opacity:1; }} 100% {{ opacity:0; }} }}
     @keyframes fadeOut {{ 0%, 96% {{ opacity:1; visibility:visible; }} 100% {{ opacity:0; visibility:hidden; }} }}
-    .badge {{ background: {st.session_state.theme}; color: white; padding: 2px 8px; border-radius: 5px; font-size: 0.75em; font-weight: bold; }}
     .msg-user {{ background: #001a3d; padding: 12px; border-radius: 10px; border-left: 5px solid {st.session_state.theme}; margin-top: 10px; }}
     .news-ticker {{ background: {st.session_state.theme}; color: white; padding: 10px; font-weight: bold; overflow: hidden; white-space: nowrap; border-radius: 5px; margin-bottom: 20px; }}
     .news-text {{ display: inline-block; padding-left: 100%; animation: ticker 30s linear infinite; }}
@@ -74,7 +73,7 @@ st.markdown(f"""<div class="news-ticker"><div class="news-text">🚀 BIENVENUE E
 # --- 5. SIDEBAR ---
 with st.sidebar:
     st.title("⚙️ Paramètres")
-    color_choice = st.selectbox("Style", ["Néon Blue", "Cyber Red", "Emerald Green"])
+    color_choice = st.selectbox("Style Visuel", ["Néon Blue", "Cyber Red", "Emerald Green"])
     st.session_state.theme = {"Néon Blue": "#0072ce", "Cyber Red": "#ff003c", "Emerald Green": "#00ff88"}[color_choice]
     
     st.divider()
@@ -93,7 +92,9 @@ if st.session_state.selected_game:
         game = res[0]
         if st.button("⬅️ Retour"): st.session_state.selected_game = None; st.rerun()
         col1, col2 = st.columns([1, 2])
-        with col1: st.image("https:" + game['cover']['url'].replace('t_thumb', 't_720p'), use_container_width=True)
+        with col1: 
+            img_url = "https:" + game['cover']['url'].replace('t_thumb', 't_720p') if 'cover' in game else "https://via.placeholder.com/720"
+            st.image(img_url, use_container_width=True)
         with col2:
             st.title(game['name'])
             st.subheader(f"Note : ⭐ {round(game.get('total_rating', 0))}/100")
@@ -101,7 +102,7 @@ if st.session_state.selected_game:
             st.link_button("🎬 Voir le Trailer", f"https://www.youtube.com/results?search_query={game['name'].replace(' ', '+')}+official+trailer")
             if st.button("⭐ Ajouter à la Wishlist"):
                 if game['name'] not in st.session_state.wishlist: st.session_state.wishlist.append(game['name']); st.rerun()
-        st.stop()
+    st.stop()
 
 # --- 7. HEADER & COMMUNAUTÉ ---
 h1, h2 = st.columns([3, 1])
@@ -113,7 +114,7 @@ if ouvrir_comm:
         cm, cd = st.columns([5, 1])
         with cm:
             st.markdown(f"<div class='msg-user'><b>{c['user']}</b>: {c['msg']}</div>", unsafe_allow_html=True)
-            if c.get('reply'): st.markdown(f"<div style='margin-left:30px; color:#ffcc00;'>↳ <b>Auteur</b>: {c['reply']}</div>", unsafe_allow_html=True)
+            if c.get('reply'): st.markdown(f"<div style='margin-left:30px; color:#ffcc00;'>↳ <b>Admin</b>: {c['reply']}</div>", unsafe_allow_html=True)
         with cd:
             if is_admin:
                 if st.button("❌", key=f"del_{i}"): st.session_state.comments.pop(i); sauver_comms(st.session_state.comments); st.rerun()
@@ -134,11 +135,11 @@ if ouvrir_comm:
         if st.button("Rejoindre le forum"): st.session_state.user_pseudo = p; st.rerun()
     st.divider()
 
-# --- 8. RECHERCHE & STYLE (LE RETOUR) ---
+# --- 8. RECHERCHE ---
 st.subheader("🔎 Trouver un jeu")
 sc1, sc2 = st.columns(2)
-with sc1: q_search = st.text_input("Nom du jeu...")
-with sc2: q_style = st.text_input("Style (ex: Action, Horreur, Zelda...)")
+with sc1: q_search = st.text_input("Rechercher par nom...")
+with sc2: q_style = st.text_input("Style (ex: Action, Horreur, RPG...)")
 
 if q_search:
     res = fetch_data(f'search "{q_search}"; fields name, cover.url; where cover != null; limit 6;')
@@ -149,25 +150,30 @@ if q_search:
                 st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
                 if st.button(f"{g['name'][:15]}", key=f"sh_{g['id']}"): st.session_state.selected_game = g['id']; st.rerun()
 
-if q_style:
-    res = fetch_data(f'search "{q_style}"; fields name, cover.url, total_rating; where cover != null & total_rating > 70; limit 6;')
-    if res:
-        st.write(f"### Recommandations pour : {q_style}")
-        cols = st.columns(6)
-        for i, g in enumerate(res):
-            with cols[i]:
-                st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                if st.button(f"{g['name'][:15]}", key=f"st_{g['id']}"): st.session_state.selected_game = g['id']; st.rerun()
-
-# --- 9. CATALOGUE ---
+# --- 9. CATALOGUE DYNAMIQUE (LE TOP MODIFIABLE) ---
 st.divider()
-platforms = {"PS5": 167, "Xbox Series": "169,49", "Switch": 130, "PC": 6}
+platforms = {"PlayStation 5": 167, "Xbox Series X|S": "169,49", "Nintendo Switch": 130, "PC (Windows)": 6}
+
 for name, p_id in platforms.items():
-    st.header(f"Top 12 {name}")
-    jeux = fetch_data(f"fields name, cover.url, total_rating; where platforms = ({p_id}) & cover != null; sort total_rating desc; limit 12;")
+    col_t1, col_t2 = st.columns([2, 1])
+    with col_t1: st.header(f"🎮 {name}")
+    with col_t2: 
+        tri = st.selectbox("Trier par :", ["Mieux notés", "Plus récents", "Plus attendus"], key=f"tri_{name}")
+    
+    # Construction de la requête selon le choix
+    if tri == "Mieux notés":
+        query = f"fields name, cover.url, total_rating; where platforms = ({p_id}) & cover != null; sort total_rating desc; limit 12;"
+    elif tri == "Plus récents":
+        query = f"fields name, cover.url, first_release_date; where platforms = ({p_id}) & cover != null & first_release_date != null; sort first_release_date desc; limit 12;"
+    else: # Plus attendus
+        query = f"fields name, cover.url, hypes; where platforms = ({p_id}) & cover != null; sort hypes desc; limit 12;"
+    
+    jeux = fetch_data(query)
     if jeux:
         cols = st.columns(6)
         for i, g in enumerate(jeux):
             with cols[i % 6]:
-                st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+                img_url = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big') if 'cover' in g else "https://via.placeholder.com/150"
+                st.image(img_url, use_container_width=True)
                 if st.button(f"{g['name'][:18]}", key=f"cat_{g['id']}_{name}"): st.session_state.selected_game = g['id']; st.rerun()
+    st.divider()
