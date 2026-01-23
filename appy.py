@@ -20,23 +20,80 @@ def fetch_games(platform_name=None, search_query=None):
     headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {token}'}
     platforms = {"PC": 6, "PS5": 167, "Xbox Series": 169, "Switch": 130}
     
-    fields = "fields name, cover.url, genres.name;"
+    fields = "fields name, cover.url, genres.name, first_release_date;"
     if search_query:
         query = f'{fields} search "{search_query}"; limit 12;'
     else:
         p_id = platforms.get(platform_name)
-        query = f'{fields} where platforms = {p_id} & rating != null & cover != null; sort rating desc; limit 12;'
+        query = f'{fields} where platforms = {p_id} & rating != null & cover != null; sort rating desc; limit 15;'
     
     try:
         res = requests.post(url, headers=headers, data=query)
         return res.json()
     except: return []
 
-# --- INTERFACE ---
-st.set_page_config(page_title="GameTrend", layout="wide")
+# --- INTERFACE STYLE PS STORE ---
+st.set_page_config(page_title="PS Store Clone", layout="wide")
 
-st.title("🎮 GameTrend : Le Top 12 par Console")
-search = st.text_input("🔍 Rechercher un jeu...")
+# CSS pour le look PlayStation (Fond sombre, défilement horizontal, cartes arrondies)
+st.markdown("""
+    <style>
+    /* Fond sombre PS Store */
+    .stApp {
+        background-color: #00051d;
+        color: white;
+    }
+    /* Conteneur pour le défilement horizontal */
+    .row-container {
+        display: flex;
+        overflow-x: auto;
+        white-space: nowrap;
+        padding-bottom: 20px;
+        gap: 15px;
+    }
+    /* Style des cartes de jeux */
+    .game-card {
+        flex: 0 0 auto;
+        width: 160px;
+        background: #1a1f3d;
+        border-radius: 12px;
+        padding: 10px;
+        transition: transform 0.3s;
+    }
+    .game-card:hover {
+        transform: scale(1.05);
+        border: 2px solid #0072ce;
+    }
+    .game-img {
+        width: 100%;
+        border-radius: 8px;
+        margin-bottom: 8px;
+    }
+    .game-title {
+        font-size: 14px;
+        font-weight: bold;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .game-genre {
+        font-size: 11px;
+        color: #b0b0b0;
+    }
+    /* Cacher la barre de défilement pour un look plus propre */
+    .row-container::-webkit-scrollbar {
+        height: 6px;
+    }
+    .row-container::-webkit-scrollbar-thumb {
+        background: #0072ce;
+        border-radius: 10px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+st.title("🎮 PlayStation™ Store")
+
+search = st.text_input("🔍 Rechercher dans le store...", placeholder="Jeux, extensions...")
 
 if search:
     jeux = fetch_games(search_query=search)
@@ -47,29 +104,24 @@ if search:
                 st.image("https:" + game['cover']['url'].replace('t_thumb', 't_cover_big'))
             st.caption(game['name'])
 else:
+    # On boucle sur les consoles pour créer les rangées
     for plateforme in ["PS5", "Xbox Series", "Switch", "PC"]:
-        st.header(f"🔥 Top {plateforme}")
+        st.subheader(f"{plateforme}")
         jeux = fetch_games(platform_name=plateforme)
         
         if jeux:
-            # LIGNE 1 (Jeux 1 à 6)
-            cols1 = st.columns(6)
-            for i in range(min(6, len(jeux))):
-                with cols1[i]:
-                    game = jeux[i]
-                    if 'cover' in game:
-                        st.image("https:" + game['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                    st.write(f"**{game['name'][:15]}**")
-                    if 'genres' in game: st.caption(f"{game['genres'][0]['name']}")
-
-            # LIGNE 2 (Jeux 7 à 12)
-            if len(jeux) > 6:
-                cols2 = st.columns(6)
-                for i in range(6, min(12, len(jeux))):
-                    with cols2[i-6]:
-                        game = jeux[i]
-                        if 'cover' in game:
-                            st.image("https:" + game['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                        st.write(f"**{game['name'][:15]}**")
-                        if 'genres' in game: st.caption(f"{game['genres'][0]['name']}")
-        st.divider()
+            # On utilise du HTML pur pour le défilement horizontal type "Store"
+            html_content = '<div class="row-container">'
+            for game in jeux:
+                img_url = "https:" + game['cover']['url'].replace('t_thumb', 't_cover_big') if 'cover' in game else ""
+                genre = game['genres'][0]['name'] if 'genres' in game else "Jeu"
+                
+                html_content += f'''
+                <div class="game-card">
+                    <img src="{img_url}" class="game-img">
+                    <div class="game-title">{game['name'][:18]}</div>
+                    <div class="game-genre">{genre}</div>
+                </div>
+                '''
+            html_content += '</div>'
+            st.markdown(html_content, unsafe_allow_html=True)
