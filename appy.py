@@ -41,7 +41,7 @@ if 'user_pseudo' not in st.session_state: st.session_state.user_pseudo = None
 if 'loaded' not in st.session_state: st.session_state.loaded = False
 if 'selected_game' not in st.session_state: st.session_state.selected_game = None
 
-# --- 4. DESIGN & ANIMATIONS (L'INTRO DU SCRIPT 3) ---
+# --- 4. DESIGN & ANIMATIONS ---
 st.set_page_config(page_title="GameTrend Ultimate 2026", layout="wide")
 
 st.markdown(f"""
@@ -72,7 +72,7 @@ if not st.session_state.loaded:
 
 st.markdown(f"""<div class="news-ticker"><div class="news-text">🚀 BIENVENUE EN 2026 : GTA VI BAT TOUS LES RECORDS -- SONY RÉVÈLE LA PS5 PRO -- NINTENDO SWITCH 2 ARRIVE -- VOS VOTES EN DIRECT -- </div></div>""", unsafe_allow_html=True)
 
-# --- 5. NAVIGATION DÉTAILS ---
+# --- 5. VUE JEU ---
 if st.session_state.selected_game:
     res = fetch_data(f"fields name, cover.url, summary, total_rating; where id = {st.session_state.selected_game};")
     if res:
@@ -83,72 +83,54 @@ if st.session_state.selected_game:
         with c2:
             st.title(game['name'])
             st.write(game.get('summary', 'Pas de description.'))
-            if st.button("❤️ Voter pour ce jeu"):
+            if st.button("❤️ Voter"):
                 st.session_state.global_w.append(game['name'])
                 sauver_data(WISHLIST_FILE, st.session_state.global_w)
-                st.success("Vote pris en compte !")
+                st.success("Voté !")
     st.stop()
 
-# --- 6. FONCTION POUR AFFICHER UN TOP 12 ---
-def afficher_top_12(titre, query, key_pref):
-    st.header(titre)
-    jeux = fetch_data(query)
-    if jeux:
+# --- 6. FONCTION AFFICHAGE ---
+def draw_12(title, query, k):
+    st.header(title)
+    data = fetch_data(query)
+    if data:
         cols = st.columns(6)
-        for i, g in enumerate(jeux):
+        for i, g in enumerate(data):
             with cols[i % 6]:
                 img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big') if 'cover' in g else ""
                 st.image(img, use_container_width=True)
-                if st.button(f"{g['name'][:18]}", key=f"{key_pref}_{g['id']}"):
+                if st.button(g['name'][:18], key=f"{k}_{g['id']}"):
                     st.session_state.selected_game = g['id']; st.rerun()
     st.divider()
 
-# --- 7. TOUS LES TYPES DE 12 ---
+# --- 7. CATALOGUE ---
+st.title("🎮 GameTrend Ultimate")
 
-st.title("🔥 Les Incontournables de 2026")
+# AAA & Indés
+draw_12("💎 Top 12 - AAA", "fields name, cover.url; where genres != (32) & total_rating > 85 & cover != null; sort total_rating desc; limit 12;", "aaa")
+draw_12("🎨 Top 12 - Indépendants", "fields name, cover.url; where genres = (32) & total_rating > 75 & cover != null; sort total_rating desc; limit 12;", "ind")
 
-# 1. TOP 12 AAA
-afficher_top_12("💎 Top 12 - Blockbusters AAA", 
-                "fields name, cover.url; where genres != (32) & total_rating > 85 & cover != null; sort total_rating desc; limit 12;", "aaa")
-
-# 2. TOP 12 INDÉPENDANTS
-afficher_top_12("🎨 Top 12 - Pépites Indépendantes", 
-                "fields name, cover.url; where genres = (32) & total_rating > 75 & cover != null; sort total_rating desc; limit 12;", "indie")
-
-# 3. TOP 12 COMMUNAUTÉ (Les plus votés)
+# Communauté
 if st.session_state.global_w:
     voted = Counter(st.session_state.global_w).most_common(12)
     names = '("' + '","'.join([v[0] for v in voted]) + '")'
-    afficher_top_12("❤️ Top 12 - Aimés par la Communauté", 
-                    f"fields name, cover.url; where name = {names} & cover != null; limit 12;", "comm")
+    draw_12("❤️ Top 12 - Communauté", f"fields name, cover.url; where name = {names} & cover != null; limit 12;", "comm")
 
-# 4. TOP 12 PS5
-afficher_top_12("🎮 Top 12 - PlayStation 5", 
-                "fields name, cover.url; where platforms = (167) & cover != null; sort total_rating desc; limit 12;", "ps5")
+# Consoles
+platforms = {"PS5": 167, "Xbox": "169,49", "Switch": 130, "PC": 6}
+for n, id_p in platforms.items():
+    draw_12(f"🎮 Top 12 - {n}", f"fields name, cover.url; where platforms = ({id_p}) & cover != null; sort total_rating desc; limit 12;", f"p_{id_p}")
 
-# 5. TOP 12 XBOX
-afficher_top_12("🎮 Top 12 - Xbox Series X|S", 
-                "fields name, cover.url; where platforms = (169,49) & cover != null; sort total_rating desc; limit 12;", "xbox")
-
-# 6. TOP 12 SWITCH
-afficher_top_12("🎮 Top 12 - Nintendo Switch", 
-                "fields name, cover.url; where platforms = (130) & cover != null; sort total_rating desc; limit 12;", "switch")
-
-# 7. TOP 12 PC
-afficher_top_12("🎮 Top 12 - PC Master Race", 
-                "fields name, cover.url; where platforms = (6) & cover != null; sort total_rating desc; limit 12;", "pc")
-
-# --- 8. COMMUNAUTÉ / FORUM ---
-st.divider()
-st.subheader("💬 Espace Communauté")
+# --- 8. FORUM ---
+st.subheader("💬 Communauté")
 if st.session_state.user_pseudo:
-    with st.form("forum"):
+    with st.form("msg"):
         m = st.text_input(f"Message de {st.session_state.user_pseudo}")
         if st.form_submit_button("Envoyer"):
             st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m})
             sauver_data(DB_FILE, st.session_state.comments); st.rerun()
 else:
-    p = st.text_input("Choisis un pseudo pour parler")
+    p = st.text_input("Pseudo")
     if st.button("Rejoindre"): st.session_state.user_pseudo = p; st.rerun()
 
 for c in st.session_state.comments[::-1]:
