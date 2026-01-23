@@ -45,7 +45,7 @@ if 'user_pseudo' not in st.session_state:
 if 'loaded' not in st.session_state:
     st.session_state.loaded = False
 
-# --- 4. DESIGN & ANIMATIONS (CSS) ---
+# --- 4. DESIGN & ANIMATIONS (CSS CORRIGÉ POUR SWITCH) ---
 st.set_page_config(page_title="GameTrend Ultra", layout="wide")
 
 st.markdown("""
@@ -56,14 +56,27 @@ st.markdown("""
     #intro-screen {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background-color: #00051d; display: flex; justify-content: center; align-items: center;
-        z-index: 10000; animation: fadeOut 6.5s forwards;
+        z-index: 10000; animation: fadeOut 7s forwards;
     }
-    .logo-img { position: absolute; width: 250px; opacity: 0; transform: scale(0.8); }
-    .ps { animation: seq 1.8s 0.5s forwards; }
-    .xb { animation: seq 1.8s 2.3s forwards; }
-    .nt { animation: seq 1.8s 4.1s forwards; }
-    @keyframes seq { 0% { opacity:0; } 50% { opacity:1; transform:scale(1); } 100% { opacity:0; transform:scale(1.1); } }
-    @keyframes fadeOut { 0%, 95% { opacity:1; visibility:visible; } 100% { opacity:0; visibility:hidden; } }
+    .logo-img { position: absolute; width: 300px; opacity: 0; transform: scale(0.8); }
+    
+    /* PlayStation : 0.5s à 2.5s */
+    .ps { animation: seq 2s 0.5s forwards; z-index: 10001; }
+    /* Xbox : 2.5s à 4.5s */
+    .xb { animation: seq 2s 2.5s forwards; z-index: 10002; }
+    /* Nintendo Switch : 4.5s à 6.5s */
+    .nt { animation: seq 2s 4.5s forwards; z-index: 10003; }
+
+    @keyframes seq { 
+        0% { opacity:0; transform:scale(0.8); } 
+        20% { opacity:1; transform:scale(1); }
+        80% { opacity:1; transform:scale(1.05); }
+        100% { opacity:0; transform:scale(1.1); } 
+    }
+    @keyframes fadeOut { 
+        0%, 95% { opacity:1; visibility:visible; } 
+        100% { opacity:0; visibility:hidden; } 
+    }
 
     /* Bulles de commentaires */
     .msg-user { background: #001a3d; padding: 12px; border-radius: 10px; border-left: 5px solid #0072ce; margin-top: 10px; }
@@ -73,12 +86,12 @@ st.markdown("""
     <div id="intro-screen">
         <img class="logo-img ps" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/PlayStation_logo.svg/1280px-PlayStation_logo.svg.png">
         <img class="logo-img xb" src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_one_logo.svg/1024px-Xbox_one_logo.svg.png">
-        <img class="logo-img nt" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Nintendo_Switch_logo_and_wordmark.svg/1280px-Nintendo_Switch_logo_and_wordmark.svg.png">
+        <img class="logo-img nt" src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Nintendo_Switch_logo_logotype.png/800px-Nintendo_Switch_logo_logotype.png">
     </div>
 """, unsafe_allow_html=True)
 
 if not st.session_state.loaded:
-    time.sleep(6.2)
+    time.sleep(6.8)
     st.session_state.loaded = True
 
 # --- 5. HEADER & BOUTON COMMUNAUTÉ ---
