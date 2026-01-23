@@ -20,80 +20,34 @@ def fetch_games(platform_name=None, search_query=None):
     headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {token}'}
     platforms = {"PC": 6, "PS5": 167, "Xbox Series": 169, "Switch": 130}
     
-    fields = "fields name, cover.url, genres.name, first_release_date;"
+    fields = "fields name, cover.url, genres.name;"
     if search_query:
         query = f'{fields} search "{search_query}"; limit 12;'
     else:
         p_id = platforms.get(platform_name)
-        query = f'{fields} where platforms = {p_id} & rating != null & cover != null; sort rating desc; limit 15;'
+        query = f'{fields} where platforms = {p_id} & rating != null & cover != null; sort rating desc; limit 12;'
     
     try:
         res = requests.post(url, headers=headers, data=query)
         return res.json()
     except: return []
 
-# --- INTERFACE STYLE PS STORE ---
-st.set_page_config(page_title="PS Store Clone", layout="wide")
+# --- INTERFACE ---
+st.set_page_config(page_title="GameTrend PS", layout="wide")
 
-# CSS pour le look PlayStation (Fond sombre, défilement horizontal, cartes arrondies)
+# CSS pour le look PS Store sans bug d'affichage
 st.markdown("""
     <style>
-    /* Fond sombre PS Store */
-    .stApp {
-        background-color: #00051d;
-        color: white;
-    }
-    /* Conteneur pour le défilement horizontal */
-    .row-container {
-        display: flex;
-        overflow-x: auto;
-        white-space: nowrap;
-        padding-bottom: 20px;
-        gap: 15px;
-    }
-    /* Style des cartes de jeux */
-    .game-card {
-        flex: 0 0 auto;
-        width: 160px;
-        background: #1a1f3d;
-        border-radius: 12px;
-        padding: 10px;
-        transition: transform 0.3s;
-    }
-    .game-card:hover {
-        transform: scale(1.05);
-        border: 2px solid #0072ce;
-    }
-    .game-img {
-        width: 100%;
-        border-radius: 8px;
-        margin-bottom: 8px;
-    }
-    .game-title {
-        font-size: 14px;
-        font-weight: bold;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    .game-genre {
-        font-size: 11px;
-        color: #b0b0b0;
-    }
-    /* Cacher la barre de défilement pour un look plus propre */
-    .row-container::-webkit-scrollbar {
-        height: 6px;
-    }
-    .row-container::-webkit-scrollbar-thumb {
-        background: #0072ce;
-        border-radius: 10px;
-    }
+    .stApp { background-color: #00051d; color: white; }
+    h3 { color: #0072ce !important; font-family: 'Segoe UI', sans-serif; }
+    .stImage img { border-radius: 10px; border: 2px solid transparent; transition: 0.3s; }
+    .stImage img:hover { border-color: #0072ce; transform: scale(1.05); }
+    div[data-testid="column"] { padding: 5px !important; }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("🎮 PlayStation™ Store")
-
-search = st.text_input("🔍 Rechercher dans le store...", placeholder="Jeux, extensions...")
+search = st.text_input("🔍 Rechercher un jeu...")
 
 if search:
     jeux = fetch_games(search_query=search)
@@ -104,24 +58,32 @@ if search:
                 st.image("https:" + game['cover']['url'].replace('t_thumb', 't_cover_big'))
             st.caption(game['name'])
 else:
-    # On boucle sur les consoles pour créer les rangées
+    # On utilise des colonnes Streamlit natives pour éviter l'affichage de texte bizarre
     for plateforme in ["PS5", "Xbox Series", "Switch", "PC"]:
-        st.subheader(f"{plateforme}")
+        st.subheader(f"✨ {plateforme}")
         jeux = fetch_games(platform_name=plateforme)
         
         if jeux:
-            # On utilise du HTML pur pour le défilement horizontal type "Store"
-            html_content = '<div class="row-container">'
-            for game in jeux:
-                img_url = "https:" + game['cover']['url'].replace('t_thumb', 't_cover_big') if 'cover' in game else ""
-                genre = game['genres'][0]['name'] if 'genres' in game else "Jeu"
-                
-                html_content += f'''
-                <div class="game-card">
-                    <img src="{img_url}" class="game-img">
-                    <div class="game-title">{game['name'][:18]}</div>
-                    <div class="game-genre">{genre}</div>
-                </div>
-                '''
-            html_content += '</div>'
-            st.markdown(html_content, unsafe_allow_html=True)
+            # On crée 2 lignes de 6 pour que ce soit bien rangé
+            # Ligne 1
+            cols1 = st.columns(6)
+            for i in range(min(6, len(jeux))):
+                with cols1[i]:
+                    game = jeux[i]
+                    img = "https:" + game['cover']['url'].replace('t_thumb', 't_cover_big') if 'cover' in game else ""
+                    st.image(img, use_container_width=True)
+                    st.write(f"**{game['name'][:15]}**")
+                    if 'genres' in game: st.caption(game['genres'][0]['name'])
+            
+            # Ligne 2
+            if len(jeux) > 6:
+                cols2 = st.columns(6)
+                for i in range(6, min(12, len(jeux))):
+                    with cols2[i-6]:
+                        game = jeux[i]
+                        img = "https:" + game['cover']['url'].replace('t_thumb', 't_cover_big') if 'cover' in game else ""
+                        st.image(img, use_container_width=True)
+                        st.write(f"**{game['name'][:15]}**")
+                        if 'genres' in game: st.caption(game['genres'][0]['name'])
+        st.divider()
+
