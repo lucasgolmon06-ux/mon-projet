@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-# --- CONFIGURATION TWITCH ---
+# --- CONFIGURATION ---
 CLIENT_ID = '21ely20t5zzbxzby557r34oi16j4hh'
 CLIENT_SECRET = 'n0i3u05gs9gmknoho2sed9q3vfn1y3'
 
@@ -13,83 +13,54 @@ def get_access_token():
         return res.json().get('access_token')
     except: return None
 
-def fetch_games(platform_name=None, search_query=None):
+def fetch_games(platform_name):
     token = get_access_token()
     if not token: return []
     url = "https://api.igdb.com/v4/games"
     headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {token}'}
     platforms = {"PC": 6, "PS5": 167, "Xbox Series": 169, "Switch": 130}
-    
-    fields = "fields name, cover.url, genres.name;"
-    if search_query:
-        query = f'{fields} search "{search_query}"; limit 12;'
-    else:
-        p_id = platforms.get(platform_name)
-        # On récupère 12 jeux pour faire les 2 lignes
-        query = f'{fields} where platforms = {p_id} & rating != null & cover != null; sort rating desc; limit 12;'
-    
+    p_id = platforms.get(platform_name)
+    query = f"fields name, cover.url, genres.name; where platforms = {p_id} & rating != null & cover != null; sort rating desc; limit 12;"
     try:
         res = requests.post(url, headers=headers, data=query)
         return res.json()
     except: return []
 
 # --- INTERFACE ---
-st.set_page_config(page_title="PlayStation Store", layout="wide")
+st.set_page_config(page_title="PS Store", layout="wide")
 
-# CSS pour réduire la taille et supprimer les scripts visibles
 st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
-    /* Titres des catégories */
-    h2 { font-size: 20px !important; color: #0072ce !important; margin-top: 30px !important; }
-    /* Réduction de l'espace entre les colonnes */
-    div[data-testid="column"] { padding: 2px !important; }
-    /* Style des noms de jeux */
-    .game-name { font-size: 12px !important; font-weight: bold; margin-bottom: 0px; }
-    .game-genre { font-size: 10px !important; color: #b0b0b0; }
-    /* Arrondir les affiches */
-    .stImage img { border-radius: 6px; }
+    .game-container { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 5px; }
+    .game-box { width: 15%; min-width: 80px; text-align: center; margin-bottom: 10px; }
+    .game-img { width: 100%; border-radius: 5px; border: 1px solid #0072ce; }
+    .game-txt { font-size: 10px !important; font-weight: bold; color: white; margin-top: 5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .genre-txt { font-size: 8px !important; color: #b0b0b0; }
+    h2 { font-size: 18px !important; color: #0072ce !important; border-bottom: 1px solid #0072ce; }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("🎮 PlayStation™ Store")
-search = st.text_input("", placeholder="🔍 Rechercher un jeu...")
 
-if search:
-    jeux = fetch_games(search_query=search)
-    cols = st.columns(6)
-    for i, game in enumerate(jeux):
-        with cols[i % 6]:
-            if 'cover' in game:
-                st.image("https:" + game['cover']['url'].replace('t_thumb', 't_cover_big'))
-            st.caption(game['name'])
-else:
-    # Pour chaque console : 2 lignes de 6
-    for plateforme in ["PS5", "Xbox Series", "Switch", "PC"]:
-        st.header(f"✨ {plateforme}")
-        jeux = fetch_games(platform_name=plateforme)
-        
-        if jeux:
-            # LIGNE 1
-            c1 = st.columns(6)
-            for i in range(min(6, len(jeux))):
-                with c1[i]:
-                    g = jeux[i]
-                    img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big') if 'cover' in g else ""
-                    st.image(img, use_container_width=True)
-                    st.markdown(f"<p class='game-name'>{g['name'][:15]}</p>", unsafe_allow_html=True)
-                    if 'genres' in g: 
-                        st.markdown(f"<p class='game-genre'>{g['genres'][0]['name']}</p>", unsafe_allow_html=True)
+for plateforme in ["PS5", "Xbox Series", "Switch", "PC"]:
+    st.header(plateforme)
+    jeux = fetch_games(plateforme)
+    
+    if jeux:
+        # On construit la grille manuellement en HTML pour bloquer les 6 colonnes
+        html_grid = '<div class="game-container">'
+        for g in jeux:
+            img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big') if 'cover' in g else ""
+            genre = g['genres'][0]['name'] if 'genres' in g else ""
             
-            # LIGNE 2
-            if len(jeux) > 6:
-                c2 = st.columns(6)
-                for i in range(6, min(12, len(jeux))):
-                    with c2[i-6]:
-                        g = jeux[i]
-                        img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big') if 'cover' in g else ""
-                        st.image(img, use_container_width=True)
-                        st.markdown(f"<p class='game-name'>{g['name'][:15]}</p>", unsafe_allow_html=True)
-                        if 'genres' in g: 
-                            st.markdown(f"<p class='game-genre'>{g['genres'][0]['name']}</p>", unsafe_allow_html=True)
-        st.divider()
+            html_grid += f'''
+            <div class="game-box">
+                <img src="{img}" class="game-img">
+                <div class="game-txt">{g['name'][:12]}</div>
+                <div class="genre-txt">{genre}</div>
+            </div>
+            '''
+        html_grid += '</div>'
+        st.markdown(html_grid, unsafe_allow_html=True)
+    st.divider()
