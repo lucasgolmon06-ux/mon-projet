@@ -54,7 +54,6 @@ st.markdown(f"""
     @keyframes fadeOut {{ 0%, 96% {{ opacity:1; visibility:visible; }} 100% {{ opacity:0; visibility:hidden; }} }}
     .badge {{ background: {st.session_state.theme}; color: white; padding: 2px 8px; border-radius: 5px; font-size: 0.75em; font-weight: bold; }}
     .msg-user {{ background: #001a3d; padding: 12px; border-radius: 10px; border-left: 5px solid {st.session_state.theme}; margin-top: 10px; }}
-    .msg-admin {{ background: #002b5c; padding: 12px; border-radius: 10px; border-left: 5px solid #ffcc00; margin-left: 30px; margin-top: 5px; color: #ffcc00; font-size: 0.9em; }}
     .news-ticker {{ background: {st.session_state.theme}; color: white; padding: 10px; font-weight: bold; overflow: hidden; white-space: nowrap; border-radius: 5px; margin-bottom: 20px; }}
     .news-text {{ display: inline-block; padding-left: 100%; animation: ticker 30s linear infinite; }}
     @keyframes ticker {{ 0% {{ transform: translate(0, 0); }} 100% {{ transform: translate(-100%, 0); }} }}
@@ -70,15 +69,13 @@ if not st.session_state.loaded:
     time.sleep(7.2)
     st.session_state.loaded = True
 
-st.markdown("""<div class="news-ticker"><div class="news-text">🚀 BIENVENUE EN 2026 SUR GAMETREND ULTIMATE -- GTA VI BAT TOUS LES RECORDS -- NINTENDO SWITCH 2 : RÉVÉLATION IMMINENTE -- </div></div>""", unsafe_allow_html=True)
+st.markdown(f"""<div class="news-ticker"><div class="news-text">🚀 BIENVENUE EN 2026 SUR GAMETREND ULTIMATE -- GTA VI BAT TOUS LES RECORDS -- NINTENDO SWITCH 2 : RÉVÉLATION IMMINENTE -- </div></div>""", unsafe_allow_html=True)
 
 # --- 5. SIDEBAR ---
 with st.sidebar:
     st.title("⚙️ Paramètres")
-    color_choice = st.selectbox("Couleur Thème", ["Néon Blue", "Cyber Red", "Emerald Green"])
-    if color_choice == "Néon Blue": st.session_state.theme = "#0072ce"
-    elif color_choice == "Cyber Red": st.session_state.theme = "#ff003c"
-    else: st.session_state.theme = "#00ff88"
+    color_choice = st.selectbox("Style", ["Néon Blue", "Cyber Red", "Emerald Green"])
+    st.session_state.theme = {"Néon Blue": "#0072ce", "Cyber Red": "#ff003c", "Emerald Green": "#00ff88"}[color_choice]
     
     st.divider()
     admin_code = st.text_input("🔑 Code Admin", type="password")
@@ -86,20 +83,24 @@ with st.sidebar:
     
     st.divider()
     st.title("⭐ Wishlist")
-    for g in st.session_state.wishlist:
-        st.markdown(f"🎮 {g}")
-    if st.button("Vider"): st.session_state.wishlist = []; st.rerun()
+    for g in st.session_state.wishlist: st.markdown(f"🎮 {g}")
+    if st.button("Vider la Wishlist"): st.session_state.wishlist = []; st.rerun()
 
 # --- 6. NAVIGATION DÉTAILS ---
 if st.session_state.selected_game:
-    g_id = st.session_state.selected_game
-    res = fetch_data(f"fields name, cover.url, summary, total_rating; where id = {g_id};")
+    res = fetch_data(f"fields name, cover.url, summary, total_rating; where id = {st.session_state.selected_game};")
     if res:
         game = res[0]
         if st.button("⬅️ Retour"): st.session_state.selected_game = None; st.rerun()
-        st.title(game['name'])
-        st.image("https:" + game['cover']['url'].replace('t_thumb', 't_720p'), width=300)
-        st.write(game.get('summary', ''))
+        col1, col2 = st.columns([1, 2])
+        with col1: st.image("https:" + game['cover']['url'].replace('t_thumb', 't_720p'), use_container_width=True)
+        with col2:
+            st.title(game['name'])
+            st.subheader(f"Note : ⭐ {round(game.get('total_rating', 0))}/100")
+            st.write(game.get('summary', ''))
+            st.link_button("🎬 Voir le Trailer", f"https://www.youtube.com/results?search_query={game['name'].replace(' ', '+')}+official+trailer")
+            if st.button("⭐ Ajouter à la Wishlist"):
+                if game['name'] not in st.session_state.wishlist: st.session_state.wishlist.append(game['name']); st.rerun()
         st.stop()
 
 # --- 7. HEADER & COMMUNAUTÉ ---
@@ -108,47 +109,57 @@ with h1: st.title("🎮 GameTrend Ultimate")
 with h2: ouvrir_comm = st.toggle("💬 Communauté")
 
 if ouvrir_comm:
-    st.subheader("💬 Forum de discussion")
-    
-    # Affichage des messages (Ancien -> Nouveau)
     for i, c in enumerate(st.session_state.comments):
-        col_msg, col_del = st.columns([5, 1])
-        with col_msg:
+        cm, cd = st.columns([5, 1])
+        with cm:
             st.markdown(f"<div class='msg-user'><b>{c['user']}</b>: {c['msg']}</div>", unsafe_allow_html=True)
-            if c.get('reply'):
-                st.markdown(f"<div class='msg-admin'><b>Réponse</b>: {c['reply']}</div>", unsafe_allow_html=True)
-        
-        with col_del:
+            if c.get('reply'): st.markdown(f"<div style='margin-left:30px; color:#ffcc00;'>↳ <b>Auteur</b>: {c['reply']}</div>", unsafe_allow_html=True)
+        with cd:
             if is_admin:
-                if st.button("❌", key=f"del_{i}"):
-                    st.session_state.comments.pop(i)
-                    sauver_comms(st.session_state.comments)
-                    st.rerun()
+                if st.button("❌", key=f"del_{i}"): st.session_state.comments.pop(i); sauver_comms(st.session_state.comments); st.rerun()
                 if not c.get('reply'):
-                    if st.button("💬", key=f"rep_btn_{i}"):
-                        st.session_state[f"show_rep_{i}"] = True
-        
-        # Champ de réponse admin
-        if is_admin and st.session_state.get(f"show_rep_{i}", False):
-            with st.container():
-                rep_txt = st.text_input("Ta réponse", key=f"txt_{i}")
-                if st.button("Envoyer", key=f"send_{i}"):
-                    st.session_state.comments[i]['reply'] = rep_txt
-                    sauver_comms(st.session_state.comments)
-                    st.rerun()
-
-    st.divider()
-    if st.session_state.user_pseudo is None:
-        p_in = st.text_input("Entre un pseudo pour parler")
-        if st.button("Rejoindre"): st.session_state.user_pseudo = p_in; st.rerun()
-    else:
-        with st.form("new_message", clear_on_submit=True):
-            m_in = st.text_area(f"Message de {st.session_state.user_pseudo}")
+                    if st.button("💬", key=f"rep_{i}"): st.session_state[f"op_{i}"] = True
+        if st.session_state.get(f"op_{i}"):
+            r_txt = st.text_input("Ta réponse", key=f"in_{i}")
+            if st.button("Répondre", key=f"go_{i}"):
+                st.session_state.comments[i]['reply'] = r_txt; sauver_comms(st.session_state.comments); st.rerun()
+    if st.session_state.user_pseudo:
+        with st.form("msg"):
+            m = st.text_area(f"Message ({st.session_state.user_pseudo})")
             if st.form_submit_button("Envoyer"):
-                st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m_in, "reply": None})
+                st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m, "reply": None})
                 sauver_comms(st.session_state.comments); st.rerun()
+    else:
+        p = st.text_input("Choisis un pseudo")
+        if st.button("Rejoindre le forum"): st.session_state.user_pseudo = p; st.rerun()
+    st.divider()
 
-# --- 8. TOPS PAR CONSOLE ---
+# --- 8. RECHERCHE & STYLE (LE RETOUR) ---
+st.subheader("🔎 Trouver un jeu")
+sc1, sc2 = st.columns(2)
+with sc1: q_search = st.text_input("Nom du jeu...")
+with sc2: q_style = st.text_input("Style (ex: Action, Horreur, Zelda...)")
+
+if q_search:
+    res = fetch_data(f'search "{q_search}"; fields name, cover.url; where cover != null; limit 6;')
+    if res:
+        cols = st.columns(6)
+        for i, g in enumerate(res):
+            with cols[i]:
+                st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+                if st.button(f"{g['name'][:15]}", key=f"sh_{g['id']}"): st.session_state.selected_game = g['id']; st.rerun()
+
+if q_style:
+    res = fetch_data(f'search "{q_style}"; fields name, cover.url, total_rating; where cover != null & total_rating > 70; limit 6;')
+    if res:
+        st.write(f"### Recommandations pour : {q_style}")
+        cols = st.columns(6)
+        for i, g in enumerate(res):
+            with cols[i]:
+                st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+                if st.button(f"{g['name'][:15]}", key=f"st_{g['id']}"): st.session_state.selected_game = g['id']; st.rerun()
+
+# --- 9. CATALOGUE ---
 st.divider()
 platforms = {"PS5": 167, "Xbox Series": "169,49", "Switch": 130, "PC": 6}
 for name, p_id in platforms.items():
@@ -156,9 +167,7 @@ for name, p_id in platforms.items():
     jeux = fetch_data(f"fields name, cover.url, total_rating; where platforms = ({p_id}) & cover != null; sort total_rating desc; limit 12;")
     if jeux:
         cols = st.columns(6)
-        for j, g in enumerate(jeux):
-            with cols[j % 6]:
+        for i, g in enumerate(jeux):
+            with cols[i % 6]:
                 st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                if st.button(f"{g['name'][:18]}", key=f"g_{g['id']}_{name}"):
-                    st.session_state.selected_game = g['id']; st.rerun()
-
+                if st.button(f"{g['name'][:18]}", key=f"cat_{g['id']}_{name}"): st.session_state.selected_game = g['id']; st.rerun()
