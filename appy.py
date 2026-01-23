@@ -3,86 +3,58 @@ import requests
 import json
 import os
 import time
+from datetime import datetime
 
 # --- 1. CONFIGURATION API IGDB ---
 CLIENT_ID = '21ely20t5zzbxzby557r34oi16j4hh'
 CLIENT_SECRET = 'n0i3u05gs9gmknoho2sed9q3vfn1y3'
 DB_FILE = "data_comms.json"
 
-# --- 2. FONCTIONS DE SAUVEGARDE ET API ---
+# --- 2. FONCTIONS SYSTÈME ---
 def charger_comms():
     if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+        with open(DB_FILE, "r", encoding="utf-8") as f: return json.load(f)
     return []
 
 def sauver_comms(comms):
-    with open(DB_FILE, "w", encoding="utf-8") as f:
-        json.dump(comms, f, indent=4)
+    with open(DB_FILE, "w", encoding="utf-8") as f: json.dump(comms, f, indent=4)
 
 @st.cache_data(ttl=3600)
 def get_access_token():
     auth_url = f"https://id.twitch.tv/oauth2/token?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&grant_type=client_credentials"
-    try:
-        res = requests.post(auth_url)
-        return res.json().get('access_token')
-    except: return None
+    res = requests.post(auth_url)
+    return res.json().get('access_token')
 
 def fetch_data(query):
     token = get_access_token()
-    if not token: return []
     headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {token}'}
-    try:
-        res = requests.post("https://api.igdb.com/v4/games", headers=headers, data=query)
-        return res.json()
-    except: return []
+    res = requests.post("https://api.igdb.com/v4/games", headers=headers, data=query)
+    return res.json()
 
 # --- 3. INITIALISATION DES SESSIONS ---
-if 'comments' not in st.session_state:
-    st.session_state.comments = charger_comms()
-if 'user_pseudo' not in st.session_state:
-    st.session_state.user_pseudo = None
-if 'loaded' not in st.session_state:
-    st.session_state.loaded = False
+if 'comments' not in st.session_state: st.session_state.comments = charger_comms()
+if 'user_pseudo' not in st.session_state: st.session_state.user_pseudo = None
+if 'loaded' not in st.session_state: st.session_state.loaded = False
+if 'wishlist' not in st.session_state: st.session_state.wishlist = []
 
-# --- 4. DESIGN & ANIMATIONS (CSS CORRIGÉ POUR SWITCH) ---
-st.set_page_config(page_title="GameTrend Ultra", layout="wide")
+# --- 4. DESIGN & ANIMATIONS CSS ---
+st.set_page_config(page_title="GameTrend Ultimate 2026", layout="wide")
 
 st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
-    
-    /* Animation Intro 3 Logos */
-    #intro-screen {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-color: #00051d; display: flex; justify-content: center; align-items: center;
-        z-index: 10000; animation: fadeOut 7s forwards;
-    }
+    #intro-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #00051d; display: flex; justify-content: center; align-items: center; z-index: 10000; animation: fadeOut 7.5s forwards; }
     .logo-img { position: absolute; width: 300px; opacity: 0; transform: scale(0.8); }
-    
-    /* PlayStation : 0.5s à 2.5s */
     .ps { animation: seq 2s 0.5s forwards; z-index: 10001; }
-    /* Xbox : 2.5s à 4.5s */
-    .xb { animation: seq 2s 2.5s forwards; z-index: 10002; }
-    /* Nintendo Switch : 4.5s à 6.5s */
-    .nt { animation: seq 2s 4.5s forwards; z-index: 10003; }
-
-    @keyframes seq { 
-        0% { opacity:0; transform:scale(0.8); } 
-        20% { opacity:1; transform:scale(1); }
-        80% { opacity:1; transform:scale(1.05); }
-        100% { opacity:0; transform:scale(1.1); } 
-    }
-    @keyframes fadeOut { 
-        0%, 95% { opacity:1; visibility:visible; } 
-        100% { opacity:0; visibility:hidden; } 
-    }
-
-    /* Bulles de commentaires */
+    .xb { animation: seq 2s 2.7s forwards; z-index: 10002; }
+    .nt { animation: seq 2s 4.9s forwards; z-index: 10003; }
+    @keyframes seq { 0% { opacity:0; transform:scale(0.8); } 20%, 80% { opacity:1; transform:scale(1); } 100% { opacity:0; transform:scale(1.1); } }
+    @keyframes fadeOut { 0%, 96% { opacity:1; visibility:visible; } 100% { opacity:0; visibility:hidden; } }
+    .badge { background: #ffcc00; color: black; padding: 2px 8px; border-radius: 5px; font-size: 0.75em; font-weight: bold; }
+    .wish-card { border: 1px solid #0072ce; padding: 10px; border-radius: 8px; margin-bottom: 8px; background: #001a3d; font-size: 0.9em; }
     .msg-user { background: #001a3d; padding: 12px; border-radius: 10px; border-left: 5px solid #0072ce; margin-top: 10px; }
-    .msg-admin { background: #002b5c; padding: 12px; border-radius: 10px; border-left: 5px solid #ffcc00; margin-left: 30px; margin-top: 5px; color: #ffcc00; font-size: 0.9em; }
+    .msg-admin { background: #002b5c; padding: 12px; border-radius: 10px; border-left: 5px solid #ffcc00; margin-left: 30px; margin-top: 5px; color: #ffcc00; }
     </style>
-
     <div id="intro-screen">
         <img class="logo-img ps" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/PlayStation_logo.svg/1280px-PlayStation_logo.svg.png">
         <img class="logo-img xb" src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_one_logo.svg/1024px-Xbox_one_logo.svg.png">
@@ -91,112 +63,107 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 if not st.session_state.loaded:
-    time.sleep(6.8)
+    time.sleep(7.2)
     st.session_state.loaded = True
 
-# --- 5. HEADER & BOUTON COMMUNAUTÉ ---
+# --- 5. SIDEBAR (WISHLIST) ---
+with st.sidebar:
+    st.title("⭐ Ma Wishlist")
+    if not st.session_state.wishlist:
+        st.write("Aucun jeu favori.")
+    else:
+        for game_name in st.session_state.wishlist:
+            st.markdown(f'<div class="wish-card">🎮 {game_name}</div>', unsafe_allow_html=True)
+        if st.button("Tout effacer"):
+            st.session_state.wishlist = []
+            st.rerun()
+
+# --- 6. HEADER & COMMUNAUTÉ ---
 h_col1, h_col2 = st.columns([3, 1])
-with h_col1:
-    st.title("🎮 GameTrend Pro")
-with h_col2:
-    ouvrir_comm = st.toggle("💬 Espace Communauté")
+with h_col1: st.title("🎮 GameTrend Ultimate")
+with h_col2: ouvrir_comm = st.toggle("💬 Communauté")
 
-# --- 6. BLOC COMMUNAUTÉ (S'OUVRE SI COCHÉ) ---
 if ouvrir_comm:
-    st.markdown("### 👥 Forum de la Communauté")
-    col_c1, col_c2 = st.columns([1, 2])
-    
-    with col_c1:
+    st.markdown("### 👥 Forum")
+    c1, c2 = st.columns([1, 2])
+    with c1:
         if st.session_state.user_pseudo is None:
-            with st.form("pseudo_form"):
-                p_in = st.text_input("Pseudo unique")
+            with st.form("p_form"):
+                p_in = st.text_input("Pseudo")
                 if st.form_submit_button("Valider"):
-                    if p_in:
-                        st.session_state.user_pseudo = p_in
-                        st.rerun()
+                    st.session_state.user_pseudo = p_in; st.rerun()
         else:
-            st.success(f"Connecté : **{st.session_state.user_pseudo}**")
-            with st.form("msg_form", clear_on_submit=True):
-                m_in = st.text_area("Ton message")
+            # Système de Rangs
+            nb_msg = sum(1 for c in st.session_state.comments if c['user'] == st.session_state.user_pseudo)
+            rank = "Nouveau" if nb_msg < 3 else "Expert" if nb_msg < 10 else "Légende"
+            st.markdown(f"Pseudo: **{st.session_state.user_pseudo}** <span class='badge'>{rank}</span>", unsafe_allow_html=True)
+            with st.form("m_form", clear_on_submit=True):
+                m_in = st.text_area("Message")
                 if st.form_submit_button("Poster"):
-                    if m_in:
-                        st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m_in, "reply": None})
-                        sauver_comms(st.session_state.comments)
-                        st.rerun()
-        st.divider()
-        admin_pass = st.text_input("🔑 Mode Admin", type="password")
-        is_admin = (admin_pass == "1234")
+                    st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m_in, "reply": None})
+                    sauver_comms(st.session_state.comments); st.rerun()
+    with c2:
+        for c in reversed(st.session_state.comments):
+            st.markdown(f"<div class='msg-user'><b>{c['user']}</b>: {c['msg']}</div>", unsafe_allow_html=True)
+            if c.get('reply'): st.markdown(f"<div class='msg-admin'><b>Auteur</b>: {c['reply']}</div>", unsafe_allow_html=True)
+    st.divider()
 
-    with col_c2:
-        for i, c in enumerate(reversed(st.session_state.comments)):
-            idx = len(st.session_state.comments) - 1 - i
-            st.markdown(f'<div class="msg-user"><b>{c["user"]}</b> : {c["msg"]}</div>', unsafe_allow_html=True)
-            if c.get('reply'):
-                st.markdown(f'<div class="msg-admin"><b>Auteur</b> : {c["reply"]}</div>', unsafe_allow_html=True)
-            elif is_admin:
-                rep = st.text_input(f"Répondre à {c['user']}", key=f"ans_{idx}")
-                if st.button("Répondre", key=f"btn_{idx}"):
-                    st.session_state.comments[idx]['reply'] = rep
-                    sauver_comms(st.session_state.comments)
-                    st.rerun()
-    st.markdown("---")
+# --- 7. HYPE CHART (CALENDRIER 2026) ---
+st.subheader("🗓️ Sorties 2026 les plus attendues")
+now = int(time.time())
+future_games = fetch_data(f"fields name, cover.url, first_release_date; where first_release_date > {now} & cover != null; sort popularity desc; limit 6;")
+if future_games:
+    cols_f = st.columns(6)
+    for i, g in enumerate(future_games):
+        with cols_f[i]:
+            st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+            date_str = datetime.fromtimestamp(g['first_release_date']).strftime('%b %Y')
+            st.caption(f"**{g['name']}**\n({date_str})")
 
-# --- 7. BARRE DE RECHERCHE ET STYLE ---
-col_s1, col_s2 = st.columns(2)
-with col_s1:
-    search_q = st.text_input("🔍 Rechercher un jeu précis...")
-with col_s2:
-    style_q = st.text_input("💡 Style de jeu recherché...")
+st.divider()
 
+# --- 8. RECHERCHE ET STYLE ---
+s_col1, s_col2 = st.columns(2)
+with s_col1: search_q = st.text_input("🔍 Rechercher un jeu...")
+with s_col2: style_q = st.text_input("💡 Style de jeu...")
+
+# (Logique de recherche simplifiée pour le bloc)
 if search_q:
     res = fetch_data(f'search "{search_q}"; fields name, cover.url; where cover != null; limit 6;')
     if res:
-        cols = st.columns(6)
-        for i, g in enumerate(res):
-            with cols[i]:
-                st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                st.caption(g['name'])
+        cols_res = st.columns(6)
+        for i, r in enumerate(res):
+            with cols_res[i]: st.image("https:" + r['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True); st.caption(r['name'])
 
-if style_q:
-    res = fetch_data(f'search "{style_q}"; fields name, cover.url, total_rating; where cover != null & total_rating > 75 & name !~ *"{style_q}"*; limit 4;')
-    if res:
-        st.subheader(f"Si tu aimes {style_q}...")
-        cols = st.columns(4)
-        for i, g in enumerate(res):
-            with cols[i]:
-                st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                st.caption(f"{g['name']} ({round(g['total_rating'])}/100)")
-
-# --- 8. TOP 12 PAR CONSOLE AVEC FILTRES ---
+# --- 9. TOPS PAR CONSOLE ---
 platforms = {"PS5": 167, "Xbox Series": "169,49", "Switch": 130, "PC": 6}
 
 for name, p_id in platforms.items():
     st.divider()
-    t_col1, t_col2 = st.columns([2, 1])
-    with t_col1:
-        st.header(f"Top 12 {name}")
-    with t_col2:
-        filtre = st.selectbox(f"Filtrer {name}", 
-                             ["Meilleures notes", "Coup de ❤️ Communauté", "Gros Budgets (AAA)", "Jeux Indépendants"],
-                             key=f"f_{name}")
-
-    base = f"platforms = ({p_id}) & cover != null"
-    if filtre == "Meilleures notes":
-        q = f"fields name, cover.url, total_rating; where {base} & total_rating != null; sort total_rating desc; limit 12;"
-    elif filtre == "Coup de ❤️ Communauté":
-        q = f"fields name, cover.url, rating; where {base} & rating != null & rating_count > 50; sort rating desc; limit 12;"
-    elif filtre == "Gros Budgets (AAA)":
-        q = f"fields name, cover.url, total_rating; where {base} & themes != (31) & total_rating > 70; sort total_rating desc; limit 12;"
-    else: # Indés
-        q = f"fields name, cover.url, total_rating; where {base} & themes = (31); sort total_rating desc; limit 12;"
+    t1, t2 = st.columns([2, 1])
+    with t1: st.header(f"Top 12 {name}")
+    with t2: filtre = st.selectbox(f"Filtrer {name}", ["Meilleures notes", "Coup de ❤️ Communauté", "AAA", "Indés"], key=f"f_{name}")
+    
+    # Construction requête
+    q_base = f"where platforms = ({p_id}) & cover != null"
+    if filtre == "Coup de ❤️ Communauté": q = f"fields name, cover.url, rating; {q_base} & rating != null & rating_count > 50; sort rating desc; limit 12;"
+    elif filtre == "Indés": q = f"fields name, cover.url, total_rating; {q_base} & themes = (31); sort total_rating desc; limit 12;"
+    else: q = f"fields name, cover.url, total_rating; {q_base} & total_rating != null; sort total_rating desc; limit 12;"
 
     jeux = fetch_data(q)
     if jeux:
         cols = st.columns(6)
         for i, g in enumerate(jeux):
             with cols[i % 6]:
-                img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big')
-                st.image(img, use_container_width=True)
-                st.markdown(f"**{g['name'][:15]}**")
-                n_val = g.get('rating') if filtre == "Coup de ❤️ Communauté" else g.get('total_rating')
-                st.markdown(f"<p style='color:#ffcc00;'>⭐ {round(n_val) if n_val else 'N/A'}/100</p>", unsafe_allow_html=True)
+                st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+                st.markdown(f"**{g['name'][:18]}**")
+                
+                # Actions : Wishlist & YouTube
+                c_a, c_b = st.columns(2)
+                with c_a:
+                    if st.button("⭐ Wish", key=f"btn_w_{g['id']}_{name}"):
+                        if g['name'] not in st.session_state.wishlist:
+                            st.session_state.wishlist.append(g['name']); st.rerun()
+                with c_b:
+                    yt = f"https://www.youtube.com/results?search_query={g['name'].replace(' ', '+')}+official+trailer"
+                    st.markdown(f"[🎬 Trailer]({yt})")
