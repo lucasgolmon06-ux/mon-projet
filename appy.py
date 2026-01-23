@@ -27,41 +27,67 @@ def fetch_games(platform_name):
     except: return []
 
 # --- INTERFACE ---
-st.set_page_config(page_title="GameTrend", layout="wide")
+st.set_page_config(page_title="GameTrend Mobile", layout="wide")
 
-# CSS simple pour le fond et les titres
 st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
-    h2 { color: #0072ce !important; font-size: 24px !important; }
-    .stCaption { color: #b0b0b0 !important; font-size: 10px !important; }
+    
+    /* LE SECRET : Conteneur qui défile horizontalement */
+    .scroll-container {
+        display: flex;
+        overflow-x: auto;
+        white-space: nowrap;
+        gap: 12px;
+        padding: 10px 5px;
+        scrollbar-width: none; /* Cache la barre sur Firefox */
+    }
+    .scroll-container::-webkit-scrollbar { display: none; } /* Cache la barre sur Chrome/Safari */
+
+    .game-card {
+        flex: 0 0 140px; /* Force chaque jeu à faire 140px de large */
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+        padding: 8px;
+        text-align: center;
+    }
+
+    .game-card img {
+        width: 100%;
+        border-radius: 6px;
+        border: 1px solid #0072ce;
+    }
+
+    .game-title {
+        font-size: 11px;
+        font-weight: bold;
+        margin-top: 8px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #efefef;
+    }
+    
+    h2 { color: #0072ce !important; font-size: 22px !important; margin-left: 10px !important; }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("🎮 PlayStation™ Store")
 
-# On boucle sur les consoles
 for plateforme in ["PS5", "Xbox Series", "Switch", "PC"]:
-    st.header(plateforme)
+    st.markdown(f"<h2>{plateforme}</h2>", unsafe_allow_html=True)
     jeux = fetch_games(plateforme)
     
     if jeux:
-        # On crée une grille de 6 colonnes (pour PC)
-        # Sur mobile, Streamlit va essayer de les réduire
-        cols = st.columns(6)
-        
-        for i, g in enumerate(jeux):
-            # On utilise le modulo % 6 pour remplir les 2 lignes (6 + 6 = 12)
-            with cols[i % 6]:
-                if 'cover' in g:
-                    img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big')
-                    st.image(img, use_container_width=True)
-                
-                # Nom du jeu en gras et petit
-                st.write(f"**{g['name'][:15]}**")
-                
-                # Genre en petit
-                if 'genres' in g:
-                    st.caption(g['genres'][0]['name'])
-    st.divider()
-
+        # On crée le bandeau défilant
+        html_content = '<div class="scroll-container">'
+        for g in jeux:
+            img_url = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big') if 'cover' in g else ""
+            html_content += f'''
+                <div class="game-card">
+                    <img src="{img_url}">
+                    <div class="game-title">{g['name']}</div>
+                </div>
+            '''
+        html_content += '</div>'
+        st.markdown(html_content, unsafe_allow_html=True)
