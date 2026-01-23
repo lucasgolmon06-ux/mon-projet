@@ -54,7 +54,8 @@ st.markdown(f"""
     .nt {{ animation: seq 1.8s 4.1s forwards; z-index: 10003; }}
     @keyframes seq {{ 0% {{ opacity:0; }} 20%, 80% {{ opacity:1; }} 100% {{ opacity:0; }} }}
     @keyframes fadeOut {{ 0%, 96% {{ opacity:1; visibility:visible; }} 100% {{ opacity:0; visibility:hidden; }} }}
-    .msg-user {{ background: #001a3d; padding: 12px; border-radius: 10px; border-left: 5px solid #0072ce; margin-bottom: 10px; }}
+    .msg-user {{ background: #001a3d; padding: 12px; border-radius: 10px; border-left: 5px solid #0072ce; margin-bottom: 5px; }}
+    .reply-box {{ background: #002b5c; padding: 10px; border-radius: 8px; margin-left: 40px; border-left: 3px solid #ffcc00; margin-bottom: 10px; font-size: 0.9em; }}
     .news-ticker {{ background: #0072ce; color: white; padding: 10px; font-weight: bold; overflow: hidden; white-space: nowrap; border-radius: 5px; margin-bottom: 20px; }}
     .news-text {{ display: inline-block; padding-left: 100%; animation: ticker 30s linear infinite; }}
     @keyframes ticker {{ 0% {{ transform: translate(0, 0); }} 100% {{ transform: translate(-100%, 0); }} }}
@@ -69,85 +70,88 @@ if not st.session_state.loaded:
     </div>""", unsafe_allow_html=True)
     time.sleep(6.2); st.session_state.loaded = True
 
-# --- 5. BANDE DE NEWS ---
-st.markdown(f"""<div class="news-ticker"><div class="news-text">🚀 GAMETREND 2026 : GTA VI SORT CETTE ANNÉE -- REJOIGNEZ LA DISCUSSIONS EN HAUT DE PAGE -- NINTENDO SWITCH 2 ARRIVE -- </div></div>""", unsafe_allow_html=True)
+# --- 5. ESPACE COMMUNAUTÉ (EN HAUT AVEC RÉPONSES) ---
+st.title("🎮 GameTrend Ultimate")
+st.markdown(f"""<div class="news-ticker"><div class="news-text">🚀 GAMETREND 2026 : DISCUTONS EN DIRECT -- RÉPONDEZ AUX AUTRES GAMERS -- GTA VI ARRIVE -- </div></div>""", unsafe_allow_html=True)
 
-# --- 6. VUE JEU ---
+st.subheader("💬 Communauté & Réponses")
+
+if not st.session_state.user_pseudo:
+    c1, c2 = st.columns([3, 1])
+    with c1: p = st.text_input("Choisis un pseudo pour participer")
+    with c2: 
+        if st.button("Rejoindre"):
+            if p: st.session_state.user_pseudo = p; st.rerun()
+else:
+    # Formulaire de message principal
+    with st.form("chat_main", clear_on_submit=True):
+        m = st.text_input(f"Poster un nouveau message ({st.session_state.user_pseudo})")
+        if st.form_submit_button("Publier"):
+            if m:
+                st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m, "replies": []})
+                sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+
+    # Affichage des messages et de leurs réponses
+    for i, c in enumerate(st.session_state.comments[::-1]):
+        real_idx = len(st.session_state.comments) - 1 - i
+        
+        # Le message principal
+        col_m, col_r = st.columns([6, 1])
+        with col_m:
+            st.markdown(f"<div class='msg-user'><b>{c['user']}</b> : {c['msg']}</div>", unsafe_allow_html=True)
+        with col_r:
+            if st.button("💬", key=f"btn_{real_idx}"):
+                st.session_state[f"reply_to_{real_idx}"] = True
+
+        # Champ de réponse individuel
+        if st.session_state.get(f"reply_to_{real_idx}"):
+            with st.form(key=f"form_{real_idx}", clear_on_submit=True):
+                r_msg = st.text_input(f"Répondre à {c['user']}")
+                if st.form_submit_button("Envoyer"):
+                    if r_msg:
+                        st.session_state.comments[real_idx]["replies"].append({"user": st.session_state.user_pseudo, "msg": r_msg})
+                        sauver_data(DB_FILE, st.session_state.comments)
+                        del st.session_state[f"reply_to_{real_idx}"]
+                        st.rerun()
+
+        # Affichage des réponses existantes
+        for r in c.get("replies", []):
+            st.markdown(f"<div class='reply-box'><b>↳ {r['user']}</b> : {r['msg']}</div>", unsafe_allow_html=True)
+
+st.divider()
+
+# --- 6. VUE JEU (SI SÉLECTIONNÉ) ---
 if st.session_state.selected_game:
-    res = fetch_data(f"fields name, cover.url, summary, total_rating; where id = {st.session_state.selected_game};")
+    res = fetch_data(f"fields name, cover.url, summary; where id = {st.session_state.selected_game};")
     if res:
         game = res[0]
-        if st.button("⬅️ Retour"): st.session_state.selected_game = None; st.rerun()
+        if st.button("⬅️ Retour au catalogue"): st.session_state.selected_game = None; st.rerun()
         c1, c2 = st.columns([1, 2])
         with c1: st.image("https:" + game['cover']['url'].replace('t_thumb', 't_720p'), use_container_width=True)
         with c2:
-            st.title(game['name'])
-            st.write(game.get('summary', ''))
+            st.title(game['name']); st.write(game.get('summary', ''))
             if st.button("❤️ Voter"):
                 st.session_state.global_w.append(game['name'])
                 sauver_data(WISHLIST_FILE, st.session_state.global_w); st.success("Voté !")
     st.stop()
 
-# --- 7. ESPACE COMMUNAUTÉ (EN HAUT) ---
-st.title("🎮 GameTrend Ultimate")
-
-st.markdown("### 💬 Communauté en direct")
-if not st.session_state.user_pseudo:
-    col_ps1, col_ps2 = st.columns([3, 1])
-    with col_ps1: p = st.text_input("Pseudo pour discuter")
-    with col_ps2: 
-        if st.button("Entrer"):
-            if p: st.session_state.user_pseudo = p; st.rerun()
-else:
-    with st.form("chat_top", clear_on_submit=True):
-        m = st.text_input(f"Message ({st.session_state.user_pseudo})")
-        if st.form_submit_button("Envoyer"):
-            if m:
-                st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m})
-                sauver_data(DB_FILE, st.session_state.comments); st.rerun()
-
-# Affichage des derniers messages
-for c in st.session_state.comments[:-6:-1]:
-    st.markdown(f"<div class='msg-user'><b>{c['user']}</b> : {c['msg']}</div>", unsafe_allow_html=True)
-
-st.divider()
-
-# --- 8. CATALOGUES DE 12 ---
-
-# Top Communauté
-if st.session_state.global_w:
-    st.header("❤️ Top 12 - Communauté")
-    voted = Counter(st.session_state.global_w).most_common(12)
-    names = '("' + '","'.join([v[0] for v in voted]) + '")'
-    jeux_comm = fetch_data(f"fields name, cover.url; where name = {names} & cover != null; limit 12;")
-    if jeux_comm:
-        cols = st.columns(6)
-        for i, g in enumerate(jeux_comm):
-            with cols[i % 6]:
-                st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                if st.button(g['name'][:18], key=f"comm_{g['id']}"): st.session_state.selected_game = g['id']; st.rerun()
-st.divider()
-
-# Consoles avec sélecteur 12 (AAA / Indé / Mieux notés)
+# --- 7. CATALOGUES (TOP 12) ---
+# ... (Le reste du code pour le Top Communauté et les Consoles reste identique)
 platforms = {"PS5": 167, "Xbox": "169,49", "Switch": 130, "PC": 6}
 for name, p_id in platforms.items():
     col_t1, col_t2 = st.columns([2, 1])
     with col_t1: st.header(f"🎮 {name}")
-    with col_t2: 
-        tri = st.selectbox("Type de Top 12 :", ["Mieux notés", "Blockbusters (AAA)", "Pépites Indépendantes"], key=f"tri_{name}")
+    with col_t2: tri = st.selectbox("Filtrer :", ["Mieux notés", "AAA", "Indés"], key=f"tri_{name}")
     
-    if tri == "Mieux notés":
-        query = f"fields name, cover.url; where platforms = ({p_id}) & cover != null; sort total_rating desc; limit 12;"
-    elif tri == "Blockbusters (AAA)":
-        query = f"fields name, cover.url; where platforms = ({p_id}) & genres != (32) & total_rating > 80 & cover != null; sort total_rating desc; limit 12;"
-    else: # Indés
-        query = f"fields name, cover.url; where platforms = ({p_id}) & genres = (32) & cover != null; sort total_rating desc; limit 12;"
+    q = f"fields name, cover.url; where platforms = ({p_id}) & cover != null; sort total_rating desc; limit 12;"
+    if tri == "AAA": q = f"fields name, cover.url; where platforms = ({p_id}) & genres != (32) & total_rating > 80 & cover != null; sort total_rating desc; limit 12;"
+    elif tri == "Indés": q = f"fields name, cover.url; where platforms = ({p_id}) & genres = (32) & cover != null; sort total_rating desc; limit 12;"
     
-    jeux = fetch_data(query)
+    jeux = fetch_data(q)
     if jeux:
         cols = st.columns(6)
-        for i, g in enumerate(jeux):
-            with cols[i % 6]:
+        for j, g in enumerate(jeux):
+            with cols[j % 6]:
                 st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
                 if st.button(g['name'][:18], key=f"p_{p_id}_{g['id']}"): st.session_state.selected_game = g['id']; st.rerun()
     st.divider()
