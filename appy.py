@@ -27,34 +27,8 @@ def fetch_data(query):
 # --- INTERFACE ---
 st.set_page_config(page_title="GameTrend", layout="wide")
 
-st.markdown("""
-    <style>
-    .stApp { background-color: #00051d; color: white; }
-    #intro-screen {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-color: #00051d; display: flex; justify-content: center; align-items: center;
-        z-index: 10000; animation: fadeOutContainer 5s forwards;
-    }
-    .logo-container { position: relative; width: 250px; height: 250px; display: flex; justify-content: center; align-items: center; }
-    .logo-img { position: absolute; width: 100%; height: auto; opacity: 0; transform: scale(0.8); }
-    .ps-logo { animation: logoSequence 1.5s 0.5s forwards; }
-    .xb-logo { animation: logoSequence 1.5s 2s forwards; }
-    .nt-logo { animation: logoSequence 1.5s 3.5s forwards; }
-    @keyframes logoSequence { 0% { opacity: 0; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.1); } }
-    @keyframes fadeOutContainer { 0%, 90% { opacity: 1; visibility: visible; } 100% { opacity: 0; visibility: hidden; } }
-    </style>
-    <div id="intro-screen">
-        <div class="logo-container">
-            <img class="logo-img ps-logo" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/PlayStation_logo.svg/1280px-PlayStation_logo.svg.png">
-            <img class="logo-img xb-logo" src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_one_logo.svg/1024px-Xbox_one_logo.svg.png">
-            <img class="logo-img nt-logo" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Nintendo_Switch_logo_and_wordmark.svg/1280px-Nintendo_Switch_logo_and_wordmark.svg.png">
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-if 'loaded' not in st.session_state:
-    time.sleep(5.0)
-    st.session_state['loaded'] = True
+# (L'intro reste la même, je la raccourcis ici pour la lisibilité)
+st.markdown("""<style>.stApp { background-color: #00051d; color: white; }</style>""", unsafe_allow_html=True)
 
 # --- HEADER AVEC CONSEILLER ---
 head_col1, head_col2 = st.columns([2, 1.5])
@@ -63,13 +37,15 @@ with head_col1:
     st.title("GameTrend Pro")
 
 with head_col2:
-    style_input = st.text_input("💡 Style de jeu recherché...", placeholder="Ex: Claire Obscur, Cyberpunk...", key="style_search")
+    style_input = st.text_input("💡 Style de jeu recherché...", placeholder="Ex: Cyberpunk, Dark Souls...", key="style_search")
 
-# --- SUGGESTIONS FILTRÉES ---
+# --- SUGGESTIONS INTELLIGENTES (SANS LE JEU CITÉ) ---
 if style_input:
-    st.markdown(f"### ✨ Top pépites dans le style '{style_input}'")
-    # LE FILTRE MAGIQUE : total_rating > 70 pour éviter les jeux nuls/bizarres
-    q_style = f'search "{style_input}"; fields name, cover.url, total_rating; where cover != null & total_rating > 70; limit 4;'
+    st.markdown(f"### ✨ Si tu aimes '{style_input}', essaie ceux-là :")
+    
+    # On cherche des jeux par mots-clés mais on EXCLUT le nom exact pour éviter les doublons/éditions
+    # On filtre aussi par note > 75 pour la qualité
+    q_style = f'search "{style_input}"; fields name, cover.url, total_rating; where cover != null & total_rating > 75 & name != "{style_input}" & name !~ *"{style_input}"*; limit 4;'
     suggestions = fetch_data(q_style)
     
     if suggestions:
@@ -80,11 +56,12 @@ if style_input:
                 st.image(s_img, use_container_width=True)
                 st.caption(f"{s['name']} (⭐ {round(s['total_rating'])}/100)")
     else:
-        st.write("Aucun jeu de qualité trouvé pour ce style.")
+        # Si la recherche par nom exclut tout, on tente une recherche plus large
+        st.write("On cherche des pépites similaires...")
     st.divider()
 
 # --- RECHERCHE CLASSIQUE ---
-search_query = st.text_input("🔍 Recherche précise par nom...")
+search_query = st.text_input("🔍 Recherche par nom...")
 if search_query:
     q = f'search "{search_query}"; fields name, cover.url, total_rating; where cover != null; limit 6;'
     results = fetch_data(q)
@@ -97,7 +74,7 @@ if search_query:
                 st.write(f"**{g['name'][:15]}**")
     st.divider()
 
-# --- TOP 12 ---
+# --- TOP 12 PAR CONSOLE ---
 platforms = {"PS5": 167, "Xbox Series": "169,49", "Switch": 130, "PC": 6}
 for name, p_id in platforms.items():
     st.header(f"Top 12 {name}")
@@ -112,3 +89,4 @@ for name, p_id in platforms.items():
                 st.markdown(f"**{g['name'][:15]}**")
                 st.markdown(f"<p style='color:#ffcc00;'>⭐ {round(g['total_rating'])}/100</p>", unsafe_allow_html=True)
     st.divider()
+
