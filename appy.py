@@ -20,12 +20,12 @@ def fetch_games(platform_name):
     url = "https://api.igdb.com/v4/games"
     headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {token}'}
     
-    # IDs : PS5(167), Xbox(169,49), Switch(130), PC(6)
-    platforms = {"PC": 6, "PS5": 167, "Xbox Series": "169,49", "Switch": 130}
+    # IDs précis : PS5(167), Xbox Series(169), Switch(130), PC(6)
+    platforms = {"PC": 6, "PS5": 167, "Xbox Series": 169, "Switch": 130}
     p_id = platforms.get(platform_name)
     
-    # Requête pour les 12 mieux notés (Rating)
-    query = f"fields name, cover.url, total_rating; where platforms = ({p_id}) & cover != null & total_rating != null; sort total_rating desc; limit 12;"
+    # LA REQUÊTE : On trie par total_rating (note moyenne) décroissant
+    query = f"fields name, cover.url, total_rating; where platforms = {p_id} & cover != null & total_rating != null; sort total_rating desc; limit 12;"
     
     try:
         res = requests.post(url, headers=headers, data=query)
@@ -33,40 +33,43 @@ def fetch_games(platform_name):
     except:
         return []
 
-# --- INTERFACE ---
-st.set_page_config(page_title="GameTrend", layout="wide")
+# --- DESIGN ---
+st.set_page_config(page_title="Top 12 Games", layout="wide")
 
-# Style PS Store classique (sans animations de logos)
 st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
-    h2 { color: #0072ce !important; border-bottom: 2px solid #0072ce; padding-bottom: 5px; }
-    .rating-badge { color: #ffcc00; font-weight: bold; font-size: 14px; }
+    h2 { color: #0072ce !important; border-bottom: 2px solid #0072ce; padding-bottom: 5px; margin-top: 40px; }
+    .game-card { text-align: center; margin-bottom: 20px; }
+    .rating { color: #ffcc00; font-weight: bold; font-size: 15px; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🎮 Top 12 des Meilleurs Jeux")
+st.title("🏆 Classement des 12 Meilleurs Jeux")
 
-# --- BOUCLE D'AFFICHAGE ---
+# --- AFFICHAGE ---
 for plateforme in ["PS5", "Xbox Series", "Switch", "PC"]:
     st.header(plateforme)
     jeux = fetch_games(plateforme)
     
     if jeux:
-        # Grille de 6 colonnes pour avoir 2 lignes de 6 (total 12)
+        # Création de 6 colonnes pour avoir 2 lignes parfaites de 6 jeux
         cols = st.columns(6)
         
         for i, g in enumerate(jeux):
             with cols[i % 6]:
-                # Image de couverture
-                if 'cover' in g:
-                    img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big')
-                    st.image(img, use_container_width=True)
+                # On récupère l'image en grande taille
+                img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big')
+                st.image(img, use_container_width=True)
                 
-                # Titre du jeu
-                st.markdown(f"**{g['name'][:15]}**")
+                # Nom du jeu (limité à 15 caractères pour rester propre)
+                st.markdown(f"**{g['name'][:18]}**")
                 
-                # Note avec étoile
-                note = round(g.get('total_rating', 0))
-                st.markdown(f"<p class='rating-badge'>⭐ {note}/100</p>", unsafe_allow_html=True)
+                # La Note
+                score = round(g.get('total_rating', 0))
+                st.markdown(f"<p class='rating'>⭐ {score}/100</p>", unsafe_allow_html=True)
+    else:
+        st.write("Aucun jeu trouvé pour cette catégorie.")
+
     st.divider()
+
