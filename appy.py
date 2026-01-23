@@ -93,4 +93,3 @@ else:
                         if 'genres' in g: 
                             st.markdown(f"<p class='game-genre'>{g['genres'][0]['name']}</p>", unsafe_allow_html=True)
         st.divider()
-
