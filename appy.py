@@ -54,7 +54,7 @@ st.markdown(f"""
     .nt {{ animation: seq 1.8s 4.1s forwards; z-index: 10003; }}
     @keyframes seq {{ 0% {{ opacity:0; }} 20%, 80% {{ opacity:1; }} 100% {{ opacity:0; }} }}
     @keyframes fadeOut {{ 0%, 96% {{ opacity:1; visibility:visible; }} 100% {{ opacity:0; visibility:hidden; }} }}
-    .msg-user {{ background: #001a3d; padding: 15px; border-radius: 10px; border-left: 5px solid #0072ce; margin-top: 15px; }}
+    .msg-user {{ background: #001a3d; padding: 12px; border-radius: 10px; border-left: 5px solid #0072ce; margin-bottom: 10px; }}
     .news-ticker {{ background: #0072ce; color: white; padding: 10px; font-weight: bold; overflow: hidden; white-space: nowrap; border-radius: 5px; margin-bottom: 20px; }}
     .news-text {{ display: inline-block; padding-left: 100%; animation: ticker 30s linear infinite; }}
     @keyframes ticker {{ 0% {{ transform: translate(0, 0); }} 100% {{ transform: translate(-100%, 0); }} }}
@@ -69,9 +69,10 @@ if not st.session_state.loaded:
     </div>""", unsafe_allow_html=True)
     time.sleep(6.2); st.session_state.loaded = True
 
-st.markdown(f"""<div class="news-ticker"><div class="news-text">🚀 GAMETREND 2026 : BIENVENUE DANS VOTRE ESPACE GAMING -- GTA VI, SWITCH 2, ET TOUTE LA COMMUNAUTÉ EN DIRECT -- </div></div>""", unsafe_allow_html=True)
+# --- 5. BANDE DE NEWS ---
+st.markdown(f"""<div class="news-ticker"><div class="news-text">🚀 GAMETREND 2026 : GTA VI SORT CETTE ANNÉE -- REJOIGNEZ LA DISCUSSIONS EN HAUT DE PAGE -- NINTENDO SWITCH 2 ARRIVE -- </div></div>""", unsafe_allow_html=True)
 
-# --- 5. VUE JEU ---
+# --- 6. VUE JEU ---
 if st.session_state.selected_game:
     res = fetch_data(f"fields name, cover.url, summary, total_rating; where id = {st.session_state.selected_game};")
     if res:
@@ -84,11 +85,34 @@ if st.session_state.selected_game:
             st.write(game.get('summary', ''))
             if st.button("❤️ Voter"):
                 st.session_state.global_w.append(game['name'])
-                sauver_data(WISHLIST_FILE, st.session_state.global_w); st.success("Vote enregistré !")
+                sauver_data(WISHLIST_FILE, st.session_state.global_w); st.success("Voté !")
     st.stop()
 
-# --- 6. CATALOGUE ---
+# --- 7. ESPACE COMMUNAUTÉ (EN HAUT) ---
 st.title("🎮 GameTrend Ultimate")
+
+st.markdown("### 💬 Communauté en direct")
+if not st.session_state.user_pseudo:
+    col_ps1, col_ps2 = st.columns([3, 1])
+    with col_ps1: p = st.text_input("Pseudo pour discuter")
+    with col_ps2: 
+        if st.button("Entrer"):
+            if p: st.session_state.user_pseudo = p; st.rerun()
+else:
+    with st.form("chat_top", clear_on_submit=True):
+        m = st.text_input(f"Message ({st.session_state.user_pseudo})")
+        if st.form_submit_button("Envoyer"):
+            if m:
+                st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m})
+                sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+
+# Affichage des derniers messages
+for c in st.session_state.comments[:-6:-1]:
+    st.markdown(f"<div class='msg-user'><b>{c['user']}</b> : {c['msg']}</div>", unsafe_allow_html=True)
+
+st.divider()
+
+# --- 8. CATALOGUES DE 12 ---
 
 # Top Communauté
 if st.session_state.global_w:
@@ -104,17 +128,17 @@ if st.session_state.global_w:
                 if st.button(g['name'][:18], key=f"comm_{g['id']}"): st.session_state.selected_game = g['id']; st.rerun()
 st.divider()
 
-# Consoles
+# Consoles avec sélecteur 12 (AAA / Indé / Mieux notés)
 platforms = {"PS5": 167, "Xbox": "169,49", "Switch": 130, "PC": 6}
 for name, p_id in platforms.items():
     col_t1, col_t2 = st.columns([2, 1])
     with col_t1: st.header(f"🎮 {name}")
     with col_t2: 
-        tri = st.selectbox("Type de Top 12 :", ["Mieux notés", "Gros Blockbusters (AAA)", "Pépites Indépendantes"], key=f"tri_{name}")
+        tri = st.selectbox("Type de Top 12 :", ["Mieux notés", "Blockbusters (AAA)", "Pépites Indépendantes"], key=f"tri_{name}")
     
     if tri == "Mieux notés":
         query = f"fields name, cover.url; where platforms = ({p_id}) & cover != null; sort total_rating desc; limit 12;"
-    elif tri == "Gros Blockbusters (AAA)":
+    elif tri == "Blockbusters (AAA)":
         query = f"fields name, cover.url; where platforms = ({p_id}) & genres != (32) & total_rating > 80 & cover != null; sort total_rating desc; limit 12;"
     else: # Indés
         query = f"fields name, cover.url; where platforms = ({p_id}) & genres = (32) & cover != null; sort total_rating desc; limit 12;"
@@ -127,28 +151,3 @@ for name, p_id in platforms.items():
                 st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
                 if st.button(g['name'][:18], key=f"p_{p_id}_{g['id']}"): st.session_state.selected_game = g['id']; st.rerun()
     st.divider()
-
-# --- 7. ESPACE COMMUNAUTAIRE (FORUM) ---
-st.subheader("💬 Espace Communauté")
-
-if st.session_state.user_pseudo:
-    with st.form("forum_msg", clear_on_submit=True):
-        m = st.text_input(f"Message en tant que {st.session_state.user_pseudo}")
-        if st.form_submit_button("Envoyer"):
-            if m:
-                st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m})
-                sauver_data(DB_FILE, st.session_state.comments)
-                st.rerun()
-else:
-    c1, c2 = st.columns([2,1])
-    with c1:
-        p = st.text_input("Choisis un pseudo pour discuter")
-    with c2:
-        if st.button("Rejoindre le forum"):
-            if p:
-                st.session_state.user_pseudo = p
-                st.rerun()
-
-# Affichage des messages
-for c in st.session_state.comments[::-1]:
-    st.markdown(f"<div class='msg-user'><b>{c['user']}</b> : {c['msg']}</div>", unsafe_allow_html=True)
