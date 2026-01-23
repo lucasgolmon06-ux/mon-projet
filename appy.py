@@ -25,28 +25,20 @@ def fetch_data(query):
     except: return []
 
 # --- INTERFACE ---
-st.set_page_config(page_title="GameTrend Ultra", layout="wide")
+st.set_page_config(page_title="GameTrend", layout="wide")
 
-# CSS : L'animation des vrais logos
 st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
     
-    /* Écran d'intro */
+    /* Intro logos */
     #intro-screen {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background-color: #00051d; display: flex; justify-content: center; align-items: center;
-        z-index: 10000; animation: fadeOutContainer 6s forwards;
+        z-index: 10000; animation: fadeOutContainer 5s forwards;
     }
-
-    .logo-container { position: relative; width: 300px; height: 300px; }
-
-    .logo-img {
-        position: absolute; width: 100%; height: auto;
-        opacity: 0; transform: scale(0.8);
-    }
-
-    /* Séquence d'apparition des logos */
+    .logo-container { position: relative; width: 250px; height: 250px; display: flex; justify-content: center; align-items: center; }
+    .logo-img { position: absolute; width: 100%; height: auto; opacity: 0; transform: scale(0.8); }
     .ps-logo { animation: logoSequence 1.5s 0.5s forwards; }
     .xb-logo { animation: logoSequence 1.5s 2s forwards; }
     .nt-logo { animation: logoSequence 1.5s 3.5s forwards; }
@@ -56,15 +48,19 @@ st.markdown("""
         50% { opacity: 1; transform: scale(1); }
         100% { opacity: 0; transform: scale(1.1); }
     }
-
     @keyframes fadeOutContainer {
-        0% { opacity: 1; visibility: visible; }
-        90% { opacity: 1; }
+        0%, 90% { opacity: 1; visibility: visible; }
         100% { opacity: 0; visibility: hidden; }
     }
 
-    .rating-badge { color: #ffcc00; font-weight: bold; }
-    .stImage:hover { transform: scale(1.05); transition: 0.3s; }
+    /* Style Suggestion */
+    .suggest-box {
+        background: rgba(0, 114, 206, 0.1);
+        padding: 15px;
+        border-radius: 15px;
+        border: 1px solid #0072ce;
+        margin-bottom: 20px;
+    }
     </style>
 
     <div id="intro-screen">
@@ -76,15 +72,37 @@ st.markdown("""
     </div>
     """, unsafe_allow_html=True)
 
-# Pause pour laisser l'animation respirer
 if 'loaded' not in st.session_state:
-    time.sleep(5.5)
+    time.sleep(5.0)
     st.session_state['loaded'] = True
 
-# --- RECHERCHE ---
-st.title("🎮 GameTrend Pro")
-search_query = st.text_input("🔍 Rechercher un jeu...")
+# --- HEADER AVEC CONSEILLER ---
+head_col1, head_col2 = st.columns([2, 1.5])
 
+with head_col1:
+    st.title("GameTrend Pro")
+
+with head_col2:
+    style_input = st.text_input("💡 Propose-moi des jeux dans le style de...", placeholder="Ex: Claire Obscur, Souls, Cyberpunk...", key="style_search")
+
+# --- AFFICHAGE DES SUGGESTIONS DE STYLE ---
+if style_input:
+    st.markdown(f"### ✨ Inspirés par '{style_input}'")
+    # On cherche des jeux qui correspondent à la description ou au nom
+    q_style = f'search "{style_input}"; fields name, cover.url, total_rating; where cover != null; limit 4;'
+    suggestions = fetch_data(q_style)
+    
+    if suggestions:
+        s_cols = st.columns(4)
+        for idx, s in enumerate(suggestions):
+            with s_cols[idx]:
+                s_img = "https:" + s['cover']['url'].replace('t_thumb', 't_cover_big')
+                st.image(s_img, use_container_width=True)
+                st.caption(s['name'])
+    st.divider()
+
+# --- RECHERCHE CLASSIQUE ---
+search_query = st.text_input("🔍 Recherche rapide par nom...")
 if search_query:
     q = f'search "{search_query}"; fields name, cover.url, total_rating, summary; where cover != null; limit 6;'
     results = fetch_data(q)
@@ -95,16 +113,14 @@ if search_query:
                 img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big')
                 st.image(img, use_container_width=True)
                 st.write(f"**{g['name'][:15]}**")
-                with st.expander("Détails"):
-                    st.write(g.get('summary', 'Pas de description.'))
     st.divider()
 
 # --- TOP 12 PAR CONSOLE ---
 platforms = {"PS5": 167, "Xbox Series": "169,49", "Switch": 130, "PC": 6}
 
 for name, p_id in platforms.items():
-    st.header(f"🏆 Top 12 {name}")
-    query = f"fields name, cover.url, total_rating, summary; where platforms = ({p_id}) & cover != null & total_rating != null; sort total_rating desc; limit 12;"
+    st.header(f"Top 12 {name}")
+    query = f"fields name, cover.url, total_rating; where platforms = ({p_id}) & cover != null & total_rating != null; sort total_rating desc; limit 12;"
     jeux = fetch_data(query)
     
     if jeux:
@@ -115,8 +131,6 @@ for name, p_id in platforms.items():
                 st.image(img, use_container_width=True)
                 st.markdown(f"**{g['name'][:15]}**")
                 note = round(g.get('total_rating', 0))
-                st.markdown(f"<p class='rating-badge'>⭐ {note}/100</p>", unsafe_allow_html=True)
-                with st.expander("Infos"):
-                    st.write(g.get('summary', '...'))
+                st.markdown(f"<p style='color:#ffcc00;'>⭐ {note}/100</p>", unsafe_allow_html=True)
     st.divider()
 
