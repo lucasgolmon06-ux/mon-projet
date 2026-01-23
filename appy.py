@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import time
 
 # --- CONFIGURATION ---
 CLIENT_ID = '21ely20t5zzbxzby557r34oi16j4hh'
@@ -26,68 +27,75 @@ def fetch_games(platform_name):
         return res.json()
     except: return []
 
-# --- INTERFACE ---
-st.set_page_config(page_title="GameTrend Mobile", layout="wide")
+# --- INTERFACE & ANIMATION ---
+st.set_page_config(page_title="GameTrend Pro", layout="wide")
 
+# CSS : Le Splash Screen et le style Store
 st.markdown("""
     <style>
+    /* Fond noir profond */
     .stApp { background-color: #00051d; color: white; }
     
-    /* LE SECRET : Conteneur qui défile horizontalement */
-    .scroll-container {
-        display: flex;
-        overflow-x: auto;
-        white-space: nowrap;
-        gap: 12px;
-        padding: 10px 5px;
-        scrollbar-width: none; /* Cache la barre sur Firefox */
-    }
-    .scroll-container::-webkit-scrollbar { display: none; } /* Cache la barre sur Chrome/Safari */
-
-    .game-card {
-        flex: 0 0 140px; /* Force chaque jeu à faire 140px de large */
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 10px;
-        padding: 8px;
-        text-align: center;
-    }
-
-    .game-card img {
-        width: 100%;
-        border-radius: 6px;
-        border: 1px solid #0072ce;
-    }
-
-    .game-title {
-        font-size: 11px;
-        font-weight: bold;
-        margin-top: 8px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        color: #efefef;
+    /* Animation de chargement */
+    #splash-screen {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background-color: #00051d;
+        display: flex; justify-content: center; align-items: center;
+        z-index: 9999;
+        animation: fadeOut 3s forwards;
     }
     
-    h2 { color: #0072ce !important; font-size: 22px !important; margin-left: 10px !important; }
+    @keyframes fadeOut {
+        0% { opacity: 1; visibility: visible; }
+        80% { opacity: 1; }
+        100% { opacity: 0; visibility: hidden; }
+    }
+
+    .loader-text {
+        font-family: 'Segoe UI', sans-serif;
+        font-size: 30px;
+        font-weight: bold;
+        color: #0072ce;
+        letter-spacing: 5px;
+        animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+        0% { transform: scale(1); opacity: 0.5; }
+        50% { transform: scale(1.1); opacity: 1; }
+        100% { transform: scale(1); opacity: 0.5; }
+    }
+    
+    h2 { color: #0072ce !important; border-bottom: 2px solid #0072ce; padding-bottom: 5px; }
     </style>
+    
+    <div id="splash-screen">
+        <div class="loader-text">GAMETREND...</div>
+    </div>
     """, unsafe_allow_html=True)
+
+# Petite attente pour laisser l'animation respirer au premier lancement
+if 'loaded' not in st.session_state:
+    time.sleep(2.5)
+    st.session_state['loaded'] = True
 
 st.title("🎮 PlayStation™ Store")
 
+# --- LE CATALOGUE ---
 for plateforme in ["PS5", "Xbox Series", "Switch", "PC"]:
-    st.markdown(f"<h2>{plateforme}</h2>", unsafe_allow_html=True)
+    st.header(plateforme)
     jeux = fetch_games(plateforme)
     
     if jeux:
-        # On crée le bandeau défilant
-        html_content = '<div class="scroll-container">'
-        for g in jeux:
-            img_url = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big') if 'cover' in g else ""
-            html_content += f'''
-                <div class="game-card">
-                    <img src="{img_url}">
-                    <div class="game-title">{g['name']}</div>
-                </div>
-            '''
-        html_content += '</div>'
-        st.markdown(html_content, unsafe_allow_html=True)
+        # Grille de 6 colonnes
+        cols = st.columns(6)
+        for i, game in enumerate(jeux):
+            with cols[i % 6]:
+                if 'cover' in game:
+                    img = "https:" + game['cover']['url'].replace('t_thumb', 't_cover_big')
+                    st.image(img, use_container_width=True)
+                st.write(f"**{game['name'][:15]}**")
+                if 'genres' in game:
+                    st.caption(game['genres'][0]['name'])
+    st.divider()
