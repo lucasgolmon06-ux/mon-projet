@@ -3,133 +3,132 @@ import requests
 import json
 import os
 
-# --- 1. RÉCUPÉRATION DES SECRETS (Sécurité Totale) ---
+# --- 1. CONFIGURATION & SECRETS ---
+st.set_page_config(page_title="GameTrend 2026", page_icon="🎮", layout="wide")
+
 CLIENT_ID = st.secrets["ID"]
 CLIENT_SECRET = st.secrets["SECRET"]
 ADMIN_PASS = st.secrets["ADMIN"]
 DB_FILE = "data_comms.json"
 
-# --- 2. FONCTIONS TECHNIQUES (IGDB & Sauvegarde) ---
+# --- 2. FONCTIONS DE SAUVEGARDE ---
 def charger_comms():
     if os.path.exists(DB_FILE):
         try:
-            with open(DB_FILE, "r", encoding="utf-8") as f: return json.load(f)
+            with open(DB_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
         except: return []
     return []
 
 def sauver_comms(comms):
-    with open(DB_FILE, "w", encoding="utf-8") as f: json.dump(comms, f, indent=4)
+    with open(DB_FILE, "w", encoding="utf-8") as f:
+        json.dump(comms, f, indent=4)
 
+# --- 3. CONNEXION IGDB ---
 @st.cache_data(ttl=3600)
 def get_token():
-    res = requests.post(f"https://id.twitch.tv/oauth2/token?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&grant_type=client_credentials")
-    return res.json().get('access_token')
+    try:
+        res = requests.post(f"https://id.twitch.tv/oauth2/token?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&grant_type=client_credentials")
+        return res.json().get('access_token')
+    except: return None
 
 def fetch(query):
-    headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {get_token()}'}
+    token = get_token()
+    headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {token}'}
     try:
         res = requests.post("https://api.igdb.com/v4/games", headers=headers, data=query)
         return res.json()
-    except:
-        return []
+    except: return []
 
-# --- 3. INITIALISATION ---
-if 'comments' not in st.session_state: st.session_state.comments = charger_comms()
-if 'user' not in st.session_state: st.session_state.user = None
-if 'game' not in st.session_state: st.session_state.game = None
-
-st.set_page_config(page_title="GameTrend 2026", layout="wide")
-
-# --- 4. DESIGN ---
+# --- 4. STYLE CSS ---
 st.markdown("""
     <style>
-    .stApp { background-color: #060d23; color: white; }
-    .msg { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; margin-bottom: 10px; border-left: 5px solid #0072ce; }
-    .stButton>button { width: 100%; border-radius: 5px; }
+    .stApp { background-color: #0b0f19; color: white; }
+    .msg-box { background: rgba(255,255,255,0.07); padding: 12px; border-radius: 10px; margin-bottom: 5px; border-left: 4px solid #00d4ff; }
+    .reply-box { background: rgba(0,212,255,0.05); padding: 10px; border-radius: 10px; margin-bottom: 5px; margin-left: 30px; border-left: 4px solid #ffcc00; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 5. BARRE LATÉRALE (SIDEBAR) ---
+# --- 5. INITIALISATION ---
+if 'comments' not in st.session_state: st.session_state.comments = charger_comms()
+if 'user' not in st.session_state: st.session_state.user = None
+if 'game' not in st.session_state: st.session_state.game = None
+if 'reply_to' not in st.session_state: st.session_state.reply_to = None
+
+# --- 6. BARRE LATÉRALE ---
 with st.sidebar:
-    st.title("🎮 GameTrend")
-    admin_input = st.text_input("🔑 Mode Admin", type="password")
+    st.title("🕹️ Menu")
+    admin_input = st.text_input("🔑 Mode Admin (Mot de passe)", type="password")
     is_admin = (admin_input == ADMIN_PASS)
-    if st.button("🏠 Retour à l'accueil"):
+    if st.button("🏠 Accueil"):
         st.session_state.game = None
         st.rerun()
-    if is_admin:
-        st.success("Mode Admin Activé")
+    if is_admin: st.success("Accès Admin OK")
 
-# --- 6. VUE DÉTAILLÉE DU JEU ---
+# --- 7. VUE DÉTAILLÉE DU JEU ---
 if st.session_state.game:
-    res = fetch(f"fields name, cover.url, summary, total_rating, genres.name; where id = {st.session_state.game};")
+    res = fetch(f"fields name, cover.url, summary, total_rating; where id = {st.session_state.game};")
     if res:
         g = res[0]
-        if st.button("⬅️ Quitter la fiche"): st.session_state.game = None; st.rerun()
+        if st.button("⬅️ Retour"): st.session_state.game = None; st.rerun()
         c1, c2 = st.columns([1, 2])
         with c1:
-            img = "https:" + g['cover']['url'].replace('t_thumb', 't_720p') if 'cover' in g else "https://via.placeholder.com/720"
-            st.image(img, use_container_width=True)
+            img = "https:" + g['cover']['url'].replace('t_thumb', 't_720p') if 'cover' in g else ""
+            st.image(img)
         with c2:
             st.title(g['name'])
-            st.subheader(f"⭐ Note : {round(g.get('total_rating', 0))}/100")
-            st.write(g.get('summary', "Pas de description disponible."))
+            st.write(g.get('summary', "Pas de description."))
     st.stop()
 
-# --- 7. RECHERCHE ET FILTRES ---
-st.title("🚀 Découvrez votre prochain jeu")
-col_s1, col_s2 = st.columns(2)
-with col_s1: search_name = st.text_input("🔍 Rechercher un nom (Zelda, Mario...)")
-with col_s2: search_style = st.text_input("🎭 Rechercher un style (Action, RPG...)")
+# --- 8. RECHERCHE ---
+st.title("🎮 Gestionnaire de Jeux")
+s = st.text_input("🔍 Rechercher un jeu ou un style...")
+if s:
+    res = fetch(f'search "{s}"; fields name, cover.url; where cover != null; limit 12;')
+    cols = st.columns(6)
+    for i, g in enumerate(res):
+        with cols[i % 6]:
+            st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'))
+            if st.button("Voir", key=f"g_{g['id']}"):
+                st.session_state.game = g['id']; st.rerun()
 
-if search_name or search_style:
-    st.subheader("🔎 Résultats")
-    term = search_name if search_name else search_style
-    q = f'search "{term}"; fields name, cover.url; where cover != null; limit 12;'
-    res = fetch(q)
-    if res:
-        cols = st.columns(6)
-        for i, game in enumerate(res):
-            with cols[i % 6]:
-                st.image("https:" + game['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                if st.button(game['name'][:15], key=f"s_{game['id']}"):
-                    st.session_state.game = game['id']; st.rerun()
-
-# --- 8. FORUM ---
+# --- 9. FORUM AVEC RÉPONSES ---
 st.divider()
-st.subheader("💬 Forum des Joueurs")
+st.subheader("💬 Forum")
 
-# Affichage des messages
 for i, c in enumerate(st.session_state.comments):
-    st.markdown(f"<div class='msg'><b>{c['user']}</b> : {c['msg']}</div>", unsafe_allow_html=True)
-    if is_admin:
-        if st.button(f"Supprimer le message {i}", key=f"del_{i}"):
-            st.session_state.comments.pop(i)
-            sauver_comms(st.session_state.comments)
+    div_class = "reply-box" if c.get('reply_to') else "msg-box"
+    prefix = f"↳ En réponse à {c['reply_to']}" if c.get('reply_to') else ""
+    
+    st.markdown(f"<div class='{div_class}'><small>{prefix}</small><br><b>{c['user']}</b> : {c['msg']}</div>", unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button(f"Répondre", key=f"rep_{i}"):
+            st.session_state.reply_to = c['user']
             st.rerun()
-
-# Formulaire pour poster
-if st.session_state.user:
-    with st.form("post_msg", clear_on_submit=True):
-        m = st.text_input(f"En tant que {st.session_state.user} :")
-        if st.form_submit_button("Envoyer"):
-            if m:
-                st.session_state.comments.append({"user": st.session_state.user, "msg": m})
+    with col2:
+        if is_admin:
+            if st.button(f"Supprimer", key=f"del_{i}"):
+                st.session_state.comments.pop(i)
                 sauver_comms(st.session_state.comments)
                 st.rerun()
-else:
-    u = st.text_input("Choisis un pseudo pour parler")
-    if st.button("Rejoindre le chat"):
-        if u: st.session_state.user = u; st.rerun()
 
-# --- 9. TOP JEUX (CATALOGUE) ---
-st.divider()
-st.subheader("🔥 Top 12 des Jeux les mieux notés")
-tops = fetch("fields name, cover.url; where total_rating > 80 & cover != null; sort total_rating desc; limit 12;")
-if tops:
-    cols = st.columns(6)
-    for i, game in enumerate(tops):
-        with cols[i % 6]:
-            st.image("https:" + game['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-            if st.button(game['name'][:15], key=f"t_{game['id']}"):
-                st.session_state.game = game['id']; st.rerun()
+if st.session_state.user:
+    with st.form("msg_form", clear_on_submit=True):
+        txt = f"Répondre à {st.session_state.reply_to}" if st.session_state.reply_to else "Votre message"
+        m = st.text_input(txt)
+        if st.form_submit_button("Envoyer"):
+            if m:
+                new_msg = {"user": st.session_state.user, "msg": m, "reply_to": st.session_state.reply_to}
+                st.session_state.comments.append(new_msg)
+                sauver_comms(st.session_state.comments)
+                st.session_state.reply_to = None
+                st.rerun()
+    if st.session_state.reply_to:
+        if st.button("Annuler la réponse"):
+            st.session_state.reply_to = None; st.rerun()
+else:
+    u = st.text_input("Pseudo pour chatter")
+    if st.button("Se connecter"):
+        if u: st.session_state.user = u; st.rerun()
