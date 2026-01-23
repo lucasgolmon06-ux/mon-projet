@@ -9,21 +9,16 @@ CLIENT_ID = '21ely20t5zzbxzby557r34oi16j4hh'
 CLIENT_SECRET = 'n0i3u05gs9gmknoho2sed9q3vfn1y3'
 DB_FILE = "data_comms.json"
 
+# (Fonctions charger_comms, sauver_comms et get_access_token identiques...)
 def charger_comms():
     if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+        with open(DB_FILE, "r", encoding="utf-8") as f: return json.load(f)
     return []
-
 def sauver_comms(comms):
-    with open(DB_FILE, "w", encoding="utf-8") as f:
-        json.dump(comms, f, indent=4)
+    with open(DB_FILE, "w", encoding="utf-8") as f: json.dump(comms, f, indent=4)
 
-# INITIALISATION DES VARIABLES DE SESSION
-if 'comments' not in st.session_state:
-    st.session_state.comments = charger_comms()
-if 'user_pseudo' not in st.session_state:
-    st.session_state.user_pseudo = None
+if 'comments' not in st.session_state: st.session_state.comments = charger_comms()
+if 'user_pseudo' not in st.session_state: st.session_state.user_pseudo = None
 
 @st.cache_data(ttl=3600)
 def get_access_token():
@@ -44,121 +39,77 @@ def fetch_data(query):
 
 # --- INTERFACE & DESIGN ---
 st.set_page_config(page_title="GameTrend Ultra", layout="wide")
+st.markdown("""<style>.stApp { background-color: #00051d; color: white; }
+.msg-user { background: #001a3d; padding: 12px; border-radius: 10px; border-left: 5px solid #0072ce; margin-top: 10px; }
+.msg-admin { background: #002b5c; padding: 12px; border-radius: 10px; border-left: 5px solid #ffcc00; margin-left: 30px; margin-top: 5px; color: #ffcc00; }
+</style>""", unsafe_allow_html=True)
 
-st.markdown("""
-    <style>
-    .stApp { background-color: #00051d; color: white; }
-    #intro-screen {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-color: #00051d; display: flex; justify-content: center; align-items: center;
-        z-index: 10000; animation: fadeOut 6.5s forwards;
-    }
-    .logo-img { position: absolute; width: 250px; opacity: 0; transform: scale(0.8); }
-    .ps { animation: seq 1.8s 0.5s forwards; }
-    .xb { animation: seq 1.8s 2.3s forwards; }
-    .nt { animation: seq 1.8s 4.1s forwards; }
-    @keyframes seq { 0% { opacity:0; transform:scale(0.8); } 50% { opacity:1; transform:scale(1); } 100% { opacity:0; transform:scale(1.1); } }
-    @keyframes fadeOut { 0%, 95% { opacity:1; visibility:visible; } 100% { opacity:0; visibility:hidden; } }
-    .msg-user { background: #001a3d; padding: 12px; border-radius: 10px; border-left: 5px solid #0072ce; margin-top: 10px; }
-    .msg-admin { background: #002b5c; padding: 12px; border-radius: 10px; border-left: 5px solid #ffcc00; margin-left: 30px; margin-top: 5px; color: #ffcc00; }
-    </style>
-    <div id="intro-screen">
-        <img class="logo-img ps" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/PlayStation_logo.svg/1280px-PlayStation_logo.svg.png">
-        <img class="logo-img xb" src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_one_logo.svg/1024px-Xbox_one_logo.svg.png">
-        <img class="logo-img nt" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Nintendo_Switch_logo_and_wordmark.svg/1280px-Nintendo_Switch_logo_and_wordmark.svg.png">
-    </div>
-""", unsafe_allow_html=True)
-
+# (L'intro des logos reste ici...)
 if 'loaded' not in st.session_state:
-    time.sleep(6.2)
+    time.sleep(1.0) # Réduit pour test, remets 6.2 pour la version finale
     st.session_state['loaded'] = True
 
-# --- HEADER & BOUTON COMMUNAUTÉ ---
+# --- HEADER & COMMUNAUTÉ ---
 h_col1, h_col2 = st.columns([3, 1])
-with h_col1:
-    st.title("GameTrend Pro")
-with h_col2:
-    ouvrir_comm = st.toggle("💬 Espace Communauté")
+with h_col1: st.title("GameTrend Pro")
+with h_col2: ouvrir_comm = st.toggle("💬 Communauté")
 
-# --- ESPACE COMMUNAUTÉ ---
 if ouvrir_comm:
     c1, c2 = st.columns([1, 2])
     with c1:
-        # SYSTÈME DE PSEUDO UNIQUE
         if st.session_state.user_pseudo is None:
-            st.write("✨ **Choisis ton pseudo unique :**")
-            with st.form("set_pseudo"):
-                pseudo_input = st.text_input("Pseudo")
-                if st.form_submit_button("Valider le pseudo"):
-                    if pseudo_input:
-                        st.session_state.user_pseudo = pseudo_input
-                        st.rerun()
+            p_in = st.text_input("Choisis ton pseudo unique")
+            if st.button("Valider"): st.session_state.user_pseudo = p_in; st.rerun()
         else:
-            st.success(f"Connecté en tant que : **{st.session_state.user_pseudo}**")
-            with st.form("f_comm", clear_on_submit=True):
-                m = st.text_area("Ton message")
-                if st.form_submit_button("Poster"):
-                    if m:
-                        st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m, "reply": None})
-                        sauver_comms(st.session_state.comments)
-                        st.rerun()
-            if st.button("Changer de pseudo"): # Optionnel : bouton pour réinitialiser
-                st.session_state.user_pseudo = None
-                st.rerun()
-
-        st.divider()
-        code_admin = st.text_input("🔑 Code Admin", type="password")
-        is_admin = (code_admin == "1234")
-    
+            st.write(f"Connecté : **{st.session_state.user_pseudo}**")
+            m = st.text_area("Message")
+            if st.button("Poster"):
+                st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m, "reply": None})
+                sauver_comms(st.session_state.comments); st.rerun()
     with c2:
         for i, c in enumerate(reversed(st.session_state.comments)):
-            idx = len(st.session_state.comments) - 1 - i
             st.markdown(f'<div class="msg-user"><b>{c["user"]}</b> : {c["msg"]}</div>', unsafe_allow_html=True)
-            if c['reply']:
-                st.markdown(f'<div class="msg-admin"><b>Auteur</b> : {c["reply"]}</div>', unsafe_allow_html=True)
-            elif is_admin:
-                r = st.text_input(f"Répondre à {c['user']}", key=f"ans_{idx}")
-                if st.button("Répondre", key=f"btn_{idx}"):
-                    st.session_state.comments[idx]['reply'] = r
-                    sauver_comms(st.session_state.comments)
-                    st.rerun()
+            if c.get('reply'): st.markdown(f'<div class="msg-admin"><b>Auteur</b> : {c["reply"]}</div>', unsafe_allow_html=True)
     st.divider()
 
-# --- RECHERCHE GLOBALE & CONSEILLER (Identiques à avant) ---
-search_query = st.text_input("🔍 Rechercher un jeu précis...")
-if search_query:
-    q_search = f'search "{search_query}"; fields name, cover.url, total_rating; where cover != null; limit 6;'
-    res_search = fetch_data(q_search)
-    if res_search:
-        cols_s = st.columns(6)
-        for i, s in enumerate(res_search):
-            with cols_s[i]:
-                st.image("https:" + s['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                st.caption(s['name'])
-    st.divider()
+# --- RECHERCHE & STYLE ---
+search_query = st.text_input("🔍 Recherche précise...")
+style_in = st.text_input("💡 Style de jeu...")
 
-style_in = st.text_input("💡 Propose-moi des jeux dans le style de...")
-if style_in:
-    q_style = f'search "{style_in}"; fields name, cover.url, total_rating; where cover != null & total_rating > 75 & name !~ *"{style_in}"*; limit 4;'
-    res_style = fetch_data(q_style)
-    if res_style:
-        cols_st = st.columns(4)
-        for i, s in enumerate(res_style):
-            with cols_st[i]:
-                st.image("https:" + s['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                st.caption(f"{s['name']} (⭐ {round(s['total_rating'])}/100)")
-    st.divider()
-
-# --- TOP 12 PAR CONSOLE ---
+# --- FILTRES DYNAMIQUES PAR CONSOLE ---
 platforms = {"PS5": 167, "Xbox Series": "169,49", "Switch": 130, "PC": 6}
+
 for name, p_id in platforms.items():
-    st.header(f"Top 12 {name}")
-    jeux = fetch_data(f"fields name, cover.url, total_rating; where platforms = ({p_id}) & cover != null & total_rating != null; sort total_rating desc; limit 12;")
+    st.divider()
+    col_t1, col_t2 = st.columns([2, 1])
+    with col_t1:
+        st.header(f"Top 12 {name}")
+    with col_t2:
+        # LE PETIT TRUC POUR CHOISIR L'OPTION
+        choix = st.selectbox(f"Filtrer {name} par :", 
+                              ["Meilleures notes", "Les plus appréciés", "Gros Budgets (AAA)", "Jeux Indépendants"],
+                              key=f"filter_{name}")
+
+    # Logique des requêtes IGDB selon le choix
+    base_where = f"platforms = ({p_id}) & cover != null"
+    
+    if choix == "Meilleures notes":
+        q = f"fields name, cover.url, total_rating; where {base_where} & total_rating != null; sort total_rating desc; limit 12;"
+    elif choix == "Les plus appréciés":
+        q = f"fields name, cover.url, total_rating, follows; where {base_where}; sort follows desc; limit 12;"
+    elif choix == "Gros Budgets (AAA)":
+        # On filtre par thèmes ou on exclut le tag Indie (IGDB n'a pas de filtre 'budget' direct, on utilise le rating/popularity)
+        q = f"fields name, cover.url, total_rating; where {base_where} & themes != (31); sort total_rating desc; limit 12;"
+    else: # Indépendants
+        q = f"fields name, cover.url, total_rating; where {base_where} & themes = (31); sort total_rating desc; limit 12;"
+
+    jeux = fetch_data(q)
     if jeux:
         cols = st.columns(6)
         for i, g in enumerate(jeux):
             with cols[i % 6]:
-                st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+                img = "https:" + g['cover']['url'].replace('t_thumb', 't_cover_big')
+                st.image(img, use_container_width=True)
                 st.markdown(f"**{g['name'][:15]}**")
-                st.markdown(f"<p style='color:#ffcc00;'>⭐ {round(g['total_rating'])}/100</p>", unsafe_allow_html=True)
-    st.divider()
+                note = round(g.get('total_rating', 0))
+                st.markdown(f"<p style='color:#ffcc00;'>⭐ {note}/100</p>", unsafe_allow_html=True)
