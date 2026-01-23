@@ -6,13 +6,13 @@ import os
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="GameTrend 2026", page_icon="🎮", layout="wide")
 
-# Récupération sécurisée
+# Récupération des secrets (le carré noir)
 CLIENT_ID = st.secrets["ID"]
 CLIENT_SECRET = st.secrets["SECRET"]
 ADMIN_PASS = st.secrets["ADMIN"]
 DB_FILE = "data_comms.json"
 
-# --- 2. FONCTIONS ---
+# --- 2. FONCTIONS TECHNIQUES ---
 def charger_comms():
     if os.path.exists(DB_FILE):
         try:
@@ -30,8 +30,10 @@ def get_token():
 
 def fetch(query):
     headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {get_token()}'}
-    res = requests.post("https://api.igdb.com/v4/games", headers=headers, data=query)
-    return res.json()
+    try:
+        res = requests.post("https://api.igdb.com/v4/games", headers=headers, data=query)
+        return res.json()
+    except: return []
 
 # --- 3. INITIALISATION ---
 if 'comments' not in st.session_state: st.session_state.comments = charger_comms()
@@ -39,7 +41,16 @@ if 'user' not in st.session_state: st.session_state.user = None
 if 'game' not in st.session_state: st.session_state.game = None
 if 'reply_to' not in st.session_state: st.session_state.reply_to = None
 
-# --- 4. BARRE LATÉRALE (ADMIN & RETOUR) ---
+# --- 4. STYLE ---
+st.markdown("""
+    <style>
+    .stApp { background-color: #0b0f19; color: white; }
+    .msg-box { background: #1e2630; padding: 12px; border-radius: 8px; border-left: 4px solid #00d4ff; margin-bottom: 5px; }
+    .reply-box { background: #262f3c; padding: 10px; border-radius: 8px; border-left: 4px solid #ffcc00; margin-left: 30px; margin-bottom: 5px; }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- 5. BARRE LATÉRALE ---
 with st.sidebar:
     st.title("🕹️ GameTrend")
     admin_input = st.text_input("🔑 Mode Admin", type="password")
@@ -47,73 +58,70 @@ with st.sidebar:
     if st.button("🏠 Retour à l'accueil"):
         st.session_state.game = None
         st.rerun()
+    if is_admin: st.success("Mode Admin Actif")
 
-# --- 5. VUE DÉTAILLÉE DU JEU ---
+# --- 6. VUE DÉTAILLÉE DU JEU ---
 if st.session_state.game:
     res = fetch(f"fields name, cover.url, summary, total_rating; where id = {st.session_state.game};")
     if res:
         g = res[0]
-        st.button("⬅️ Retour", on_click=lambda: setattr(st.session_state, 'game', None))
+        if st.button("⬅️ Retour"): st.session_state.game = None; st.rerun()
         c1, c2 = st.columns([1, 2])
-        with c1: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_720p'))
+        with c1: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_720p') if 'cover' in g else "")
         with c2:
             st.title(g['name'])
-            st.write(g.get('summary', "Aucune description."))
+            st.subheader(f"Note : {round(g.get('total_rating', 0))}/100")
+            st.write(g.get('summary', "Pas de description."))
     st.stop()
 
-# --- 6. SECTION RECHERCHE ---
+# --- 7. RECHERCHE & TOP JEUX ---
 st.title("🚀 GameTrend 2026")
-search = st.text_input("🔍 Rechercher un jeu, une console ou un style (Action, RPG...)")
+search = st.text_input("🔍 Rechercher un jeu (Zelda, Mario, Action, RPG...)")
+
 if search:
+    st.subheader("🔎 Résultats")
     res = fetch(f'search "{search}"; fields name, cover.url; where cover != null; limit 12;')
+else:
+    st.subheader("🔥 Top 12 des Jeux 2026")
+    res = fetch("fields name, cover.url; where total_rating > 80 & cover != null; sort total_rating desc; limit 12;")
+
+if res:
     cols = st.columns(6)
     for i, g in enumerate(res):
-        with cols[i%6]:
+        with cols[i % 6]:
             st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'))
-            if st.button(g['name'][:15], key=f"s_{g['id']}"):
+            if st.button(g['name'][:15], key=f"g_{g['id']}"):
                 st.session_state.game = g['id']; st.rerun()
 
-# --- 7. TOP 12 DES JEUX (POPULAIRES) ---
+# --- 8. ACTUALITÉS ---
 st.divider()
-st.subheader("🔥 Top 12 des Jeux du moment")
-tops = fetch("fields name, cover.url; where total_rating > 80 & cover != null; sort total_rating desc; limit 12;")
-cols = st.columns(6)
-for i, g in enumerate(tops):
-    with cols[i%6]:
-        st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'))
-        if st.button(g['name'][:15], key=f"t_{g['id']}"):
-            st.session_state.game = g['id']; st.rerun()
-
-# --- 8. SECTION NEWS (SIMULÉES 2026) ---
-st.divider()
-st.subheader("📰 Actualités Gaming 2026")
+st.subheader("📰 News Gaming")
 col_n1, col_n2 = st.columns(2)
-with col_n1:
-    st.info("**GTA VI :** Nouveau DLC 'Vice City Nights' annoncé pour cet été !")
-with col_n2:
-    st.warning("**Nintendo :** La 'Switch 2' reçoit sa première mise à jour majeure.")
+with col_n1: st.info("**PS6 :** Des rumeurs sur un nouveau processeur ultra-puissant.")
+with col_n2: st.warning("**Xbox :** Trois nouvelles exclusivités annoncées pour Noël.")
 
-# --- 9. FORUM AVEC RÉPONSES ---
+# --- 9. FORUM ---
 st.divider()
-st.subheader("💬 Forum")
+st.subheader("💬 Forum des Joueurs")
+
 for i, c in enumerate(st.session_state.comments):
-    box_style = "margin-left: 30px; border-left: 3px solid orange;" if c.get('reply_to') else "border-left: 3px solid blue;"
-    st.markdown(f"<div style='background: #1e2630; padding: 10px; border-radius: 5px; {box_style} margin-bottom: 5px;'>"
-                f"<small>{'↳ Réponse à ' + c['reply_to'] if c.get('reply_to') else ''}</small><br>"
-                f"<b>{c['user']}</b> : {c['msg']}</div>", unsafe_allow_html=True)
+    style = "reply-box" if c.get('reply_to') else "msg-box"
+    prefix = f"↳ Réponse à {c['reply_to']}" if c.get('reply_to') else ""
+    st.markdown(f"<div class='{style}'><small>{prefix}</small><br><b>{c['user']}</b> : {c['msg']}</div>", unsafe_allow_html=True)
     
-    col_f1, col_f2 = st.columns([1, 5])
-    with col_f1:
-        if st.button("Répondre", key=f"rep_{i}"): st.session_state.reply_to = c['user']; st.rerun()
-    with col_f2:
+    col1, col2 = st.columns([1, 5])
+    with col1:
+        if st.button("Répondre", key=f"rep_{i}"):
+            st.session_state.reply_to = c['user']; st.rerun()
+    with col2:
         if is_admin:
             if st.button("Supprimer", key=f"del_{i}"):
                 st.session_state.comments.pop(i); sauver_comms(st.session_state.comments); st.rerun()
 
 if st.session_state.user:
-    with st.form("msg", clear_on_submit=True):
-        label = f"Répondre à {st.session_state.reply_to}" if st.session_state.reply_to else "Message"
-        m = st.text_input(label)
+    with st.form("forum_form", clear_on_submit=True):
+        txt = f"Répondre à {st.session_state.reply_to}" if st.session_state.reply_to else "Ton message"
+        m = st.text_input(txt)
         if st.form_submit_button("Envoyer"):
             if m:
                 st.session_state.comments.append({"user": st.session_state.user, "msg": m, "reply_to": st.session_state.reply_to})
@@ -122,4 +130,5 @@ if st.session_state.user:
         if st.button("Annuler la réponse"): st.session_state.reply_to = None; st.rerun()
 else:
     u = st.text_input("Pseudo")
-    if st.button("Se connecter"): st.session_state.user = u; st.rerun()
+    if st.button("Se connecter au chat"):
+        if u: st.session_state.user = u; st.rerun()
