@@ -3,13 +3,15 @@ import requests
 import json
 import os
 
-# --- 1. RÉCUPÉRATION DES SECRETS (Sécurité Totale) ---
+# --- 1. CONFIGURATION & SECRETS ---
+st.set_page_config(page_title="GameTrend 2026", layout="wide")
+
 CLIENT_ID = st.secrets["ID"]
 CLIENT_SECRET = st.secrets["SECRET"]
 ADMIN_PASS = st.secrets["ADMIN"]
 DB_FILE = "data_comms.json"
 
-# --- 2. FONCTIONS TECHNIQUES (IGDB & Sauvegarde) ---
+# --- 2. FONCTIONS TECHNIQUES ---
 def charger_comms():
     if os.path.exists(DB_FILE):
         try:
@@ -30,106 +32,122 @@ def fetch(query):
     try:
         res = requests.post("https://api.igdb.com/v4/games", headers=headers, data=query)
         return res.json()
-    except:
-        return []
+    except: return []
 
 # --- 3. INITIALISATION ---
 if 'comments' not in st.session_state: st.session_state.comments = charger_comms()
 if 'user' not in st.session_state: st.session_state.user = None
 if 'game' not in st.session_state: st.session_state.game = None
-
-st.set_page_config(page_title="GameTrend 2026", layout="wide")
+if 'reply_to' not in st.session_state: st.session_state.reply_to = None # Pour stocker à qui on répond
 
 # --- 4. DESIGN ---
 st.markdown("""
     <style>
     .stApp { background-color: #060d23; color: white; }
-    .msg { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; margin-bottom: 10px; border-left: 5px solid #0072ce; }
+    .msg { background: rgba(255,255,255,0.05); padding: 12px; border-radius: 10px; margin-bottom: 5px; border-left: 5px solid #0072ce; }
+    .reply { background: rgba(255,165,0,0.1); padding: 10px; border-radius: 10px; margin-bottom: 5px; border-left: 5px solid #ffa500; margin-left: 40px; }
     .stButton>button { width: 100%; border-radius: 5px; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 5. BARRE LATÉRALE (SIDEBAR) ---
+# --- 5. BARRE LATÉRALE ---
 with st.sidebar:
     st.title("🎮 GameTrend")
     admin_input = st.text_input("🔑 Mode Admin", type="password")
     is_admin = (admin_input == ADMIN_PASS)
-    if st.button("🏠 Retour à l'accueil"):
+    if st.button("🏠 Accueil"):
         st.session_state.game = None
         st.rerun()
-    if is_admin:
-        st.success("Mode Admin Activé")
 
-# --- 6. VUE DÉTAILLÉE DU JEU ---
+# --- 6. VUE JEU ---
 if st.session_state.game:
-    res = fetch(f"fields name, cover.url, summary, total_rating, genres.name; where id = {st.session_state.game};")
+    res = fetch(f"fields name, cover.url, summary, total_rating; where id = {st.session_state.game};")
     if res:
         g = res[0]
-        if st.button("⬅️ Quitter la fiche"): st.session_state.game = None; st.rerun()
+        if st.button("⬅️ Retour"): st.session_state.game = None; st.rerun()
         c1, c2 = st.columns([1, 2])
-        with c1:
-            img = "https:" + g['cover']['url'].replace('t_thumb', 't_720p') if 'cover' in g else "https://via.placeholder.com/720"
-            st.image(img, use_container_width=True)
+        with c1: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_720p') if 'cover' in g else "")
         with c2:
             st.title(g['name'])
-            st.subheader(f"⭐ Note : {round(g.get('total_rating', 0))}/100")
-            st.write(g.get('summary', "Pas de description disponible."))
+            st.write(g.get('summary', "Pas de description."))
     st.stop()
 
-# --- 7. RECHERCHE ET FILTRES ---
-st.title("🚀 Découvrez votre prochain jeu")
-col_s1, col_s2 = st.columns(2)
-with col_s1: search_name = st.text_input("🔍 Rechercher un nom (Zelda, Mario...)")
-with col_s2: search_style = st.text_input("🎭 Rechercher un style (Action, RPG...)")
+# --- 7. RECHERCHE ---
+st.title("🚀 GameTrend 2026")
+s1, s2 = st.columns(2)
+with s1: sn = st.text_input("🔍 Nom du jeu")
+with s2: ss = st.text_input("🎭 Style")
 
-if search_name or search_style:
-    st.subheader("🔎 Résultats")
-    term = search_name if search_name else search_style
-    q = f'search "{term}"; fields name, cover.url; where cover != null; limit 12;'
-    res = fetch(q)
+if sn or ss:
+    term = sn if sn else ss
+    res = fetch(f'search "{term}"; fields name, cover.url; where cover != null; limit 12;')
     if res:
         cols = st.columns(6)
-        for i, game in enumerate(res):
-            with cols[i % 6]:
-                st.image("https:" + game['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                if st.button(game['name'][:15], key=f"s_{game['id']}"):
-                    st.session_state.game = game['id']; st.rerun()
+        for i, g in enumerate(res):
+            with cols[i%6]:
+                st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'))
+                if st.button(g['name'][:15], key=f"s_{g['id']}"):
+                    st.session_state.game = g['id']; st.rerun()
 
-# --- 8. FORUM ---
+# --- 8. FORUM (SYSTÈME DE RÉPONSES) ---
 st.divider()
 st.subheader("💬 Forum des Joueurs")
 
-# Affichage des messages
 for i, c in enumerate(st.session_state.comments):
-    st.markdown(f"<div class='msg'><b>{c['user']}</b> : {c['msg']}</div>", unsafe_allow_html=True)
-    if is_admin:
-        if st.button(f"Supprimer le message {i}", key=f"del_{i}"):
-            st.session_state.comments.pop(i)
-            sauver_comms(st.session_state.comments)
+    # On vérifie si c'est une réponse ou un message normal
+    style_class = "reply" if c.get("is_reply") else "msg"
+    mention = f"<small style='color: #ffa500;'>↳ En réponse à {c['target']}</small><br>" if c.get("is_reply") else ""
+    
+    st.markdown(f"<div class='{style_class}'>{mention}<b>{c['user']}</b> : {c['msg']}</div>", unsafe_allow_html=True)
+    
+    # Boutons d'action
+    col_a, col_b = st.columns([1, 6])
+    with col_a:
+        if st.button("💬", key=f"rep_btn_{i}", help="Répondre"):
+            st.session_state.reply_to = c['user']
             st.rerun()
-
-# Formulaire pour poster
-if st.session_state.user:
-    with st.form("post_msg", clear_on_submit=True):
-        m = st.text_input(f"En tant que {st.session_state.user} :")
-        if st.form_submit_button("Envoyer"):
-            if m:
-                st.session_state.comments.append({"user": st.session_state.user, "msg": m})
+    with col_b:
+        if is_admin:
+            if st.button("🗑️", key=f"del_{i}", help="Supprimer"):
+                st.session_state.comments.pop(i)
                 sauver_comms(st.session_state.comments)
                 st.rerun()
+
+# Formulaire dynamique (Post ou Réponse)
+if st.session_state.user:
+    with st.form("post_form", clear_on_submit=True):
+        label = f"Répondre à {st.session_state.reply_to}" if st.session_state.reply_to else f"Message en tant que {st.session_state.user}"
+        m = st.text_input(label)
+        c_sub, c_can = st.columns([1, 1])
+        with c_sub:
+            if st.form_submit_button("Envoyer"):
+                if m:
+                    new_c = {"user": st.session_state.user, "msg": m}
+                    if st.session_state.reply_to:
+                        new_c["is_reply"] = True
+                        new_c["target"] = st.session_state.reply_to
+                    st.session_state.comments.append(new_c)
+                    sauver_comms(st.session_state.comments)
+                    st.session_state.reply_to = None
+                    st.rerun()
+        with c_can:
+            if st.session_state.reply_to:
+                if st.form_submit_button("Annuler"):
+                    st.session_state.reply_to = None
+                    st.rerun()
 else:
-    u = st.text_input("Choisis un pseudo pour parler")
-    if st.button("Rejoindre le chat"):
+    u = st.text_input("Pseudo pour parler")
+    if st.button("Se connecter"):
         if u: st.session_state.user = u; st.rerun()
 
-# --- 9. TOP JEUX (CATALOGUE) ---
+# --- 9. CATALOGUE ---
 st.divider()
-st.subheader("🔥 Top 12 des Jeux les mieux notés")
+st.subheader("🔥 Top 12")
 tops = fetch("fields name, cover.url; where total_rating > 80 & cover != null; sort total_rating desc; limit 12;")
 if tops:
     cols = st.columns(6)
-    for i, game in enumerate(tops):
-        with cols[i % 6]:
-            st.image("https:" + game['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-            if st.button(game['name'][:15], key=f"t_{game['id']}"):
-                st.session_state.game = game['id']; st.rerun()
+    for i, g in enumerate(tops):
+        with cols[i%6]:
+            st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'))
+            if st.button(g['name'][:15], key=f"t_{g['id']}"):
+                st.session_state.game = g['id']; st.rerun()
