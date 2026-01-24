@@ -41,33 +41,50 @@ if 'selected_game' not in st.session_state: st.session_state.selected_game = Non
 st.set_page_config(page_title="GameTrend", layout="wide")
 st.markdown("""
     <style>
+    /* Fond sombre discret */
     .stApp {
         background: radial-gradient(circle at top, #000a1f 0%, #00050d 100%);
         color: #d1d1d1;
     }
-    h1, h2, h3 { color: #ffffff; font-weight: 300; letter-spacing: 1px; }
+    
+    /* Titres sobres avec fine lueur */
+    h1, h2 {
+        color: #ffffff;
+        font-weight: 300;
+        letter-spacing: 1px;
+    }
+
+    /* News ticker discret */
     .news-ticker {
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        color: #888; padding: 5px; font-size: 0.8rem; text-align: center; margin-bottom: 20px;
+        color: #888;
+        padding: 5px;
+        font-size: 0.8rem;
+        text-align: center;
+        margin-bottom: 20px;
     }
+
+    /* Boutons avec dégradé subtil */
     .stButton>button {
         background: linear-gradient(to right, #004e92, #000428);
-        color: white; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;
+        color: white;
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 4px;
         transition: 0.4s;
     }
-    .stButton>button:hover { border-color: #00f2ff; color: #00f2ff; background: transparent; }
-    .chat-msg { border-left: 2px solid rgba(255,255,255,0.1); padding-left: 15px; margin-bottom: 8px; font-size: 0.9rem; }
-    
-    /* Zone des prix discrète */
-    .price-box {
-        background: rgba(255, 255, 255, 0.03);
-        padding: 15px;
-        border-radius: 5px;
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        margin-top: 10px;
+    .stButton>button:hover {
+        border-color: #00f2ff;
+        color: #00f2ff;
+        background: transparent;
     }
-    .price-line { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
-    .price-line:last-child { border-bottom: none; }
+
+    /* Zone de chat discrète */
+    .chat-msg {
+        border-left: 2px solid rgba(255,255,255,0.1);
+        padding-left: 15px;
+        margin-bottom: 8px;
+        font-size: 0.9rem;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -82,22 +99,9 @@ if st.session_state.page == "details" and st.session_state.selected_game:
     with c1:
         if 'videos' in g: st.video(f"https://www.youtube.com/watch?v={g['videos'][0]['video_id']}")
         if 'screenshots' in g: st.image("https:" + g['screenshots'][0]['url'].replace('t_thumb', 't_720p'))
-        st.write("### Résumé")
-        st.caption(g.get('summary', 'Aucune description disponible.'))
     with c2:
-        if 'cover' in g: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'))
-        
-        # AJOUT DES PRIX UNIQUEMENT ICI
-        st.write("### 💰 Prix indicatifs")
-        st.markdown(f"""
-            <div class="price-box">
-                <div class="price-line"><span>PlayStation 5</span><b>79.99€</b></div>
-                <div class="price-line"><span>Xbox Series X</span><b>79.99€</b></div>
-                <div class="price-line"><span>PC Digital</span><b>69.99€</b></div>
-                <div class="price-line"><span>Switch</span><b>59.99€</b></div>
-            </div>
-        """, unsafe_allow_html=True)
-
+        st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'))
+        st.caption(g.get('summary', ''))
     st.stop()
 
 # --- 5. ACCUEIL ---
