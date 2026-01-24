@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import json
 import os
+from datetime import datetime
 
 # --- 1. CONFIGURATION & DONNÉES ---
 CLIENT_ID = '21ely20t5zzbxzby557r34oi16j4hh'
@@ -29,9 +30,9 @@ def get_access_token():
 
 def fetch_data(endpoint, query):
     token = get_access_token()
-    headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {token}'}
+    headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {token}', 'Content-Type': 'text/plain'}
     res = requests.post(f"https://api.igdb.com/v4/{endpoint}", headers=headers, data=query)
-    return res.json()
+    return res.json() if res.status_code == 200 else []
 
 # --- 2. INITIALISATION ---
 if 'comments' not in st.session_state: st.session_state.comments = charger_data(DB_FILE)
@@ -45,13 +46,12 @@ st.set_page_config(page_title="GameTrend 2026", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
-    .news-ticker { background: #0072ce; color: white; padding: 12px; font-weight: bold; overflow: hidden; white-space: nowrap; border-radius: 5px; margin-bottom: 20px;}
-    .news-text { display: inline-block; padding-left: 100%; animation: ticker 25s linear infinite; }
-    @keyframes ticker { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
+    .news-ticker { background: #0072ce; color: white; padding: 12px; font-weight: bold; border-radius: 5px; margin-bottom: 20px; text-align: center;}
     .admin-reply { background: #1a1a00; border-left: 5px solid #ffcc00; padding: 10px; margin-left: 30px; border-radius: 8px; color: #ffcc00; margin-top:5px; }
     .badge-admin { background: linear-gradient(45deg, #ffd700, #ff8c00); color: black; padding: 2px 8px; border-radius: 4px; font-weight: bold; margin-right: 10px; }
     .price-card { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border: 1px solid #0072ce; }
     .price-line { display: flex; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
+    .best-badge { background: #ff4b4b; color: white; padding: 2px 5px; border-radius: 3px; font-size: 0.7rem; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -73,25 +73,24 @@ if st.session_state.page == "details" and st.session_state.selected_game:
     with c_desc:
         if 'cover' in g:
             st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-        st.metric("NOTE COMMUNAUTÉ", f"{int(g.get('total_rating', 0))}/100")
+        if g.get('total_rating'):
+            st.metric("SCORE ÉLITE", f"{int(g['total_rating'])}/100")
         
-        st.markdown("### 💰 Prix Estimés")
+        st.markdown("### 💰 Tarifs 2026")
         st.markdown(f"""
             <div class="price-card">
-                <div class="price-line"><span>Consoles Next-Gen</span><b>79.99€</b></div>
-                <div class="price-line"><span>PC Digital</span><b>69.99€</b></div>
-                <div class="price-line"><span>Nintendo Switch</span><b>59.99€</b></div>
+                <div class="price-line"><span>Édition Standard</span><b>79.99€</b></div>
+                <div class="price-line"><span>PC / Steam</span><b>69.99€</b></div>
             </div>
         """, unsafe_allow_html=True)
-        st.write("")
-        st.info(g.get('summary', 'Pas de description.'))
+        st.info(g.get('summary', 'Description confidentielle.'))
     st.stop()
 
 # --- 5. ACCUEIL ---
-st.markdown('<div class="news-ticker"><div class="news-text">🚀 GAMETREND 2026 -- LES MEILLEURS JEUX (POST-2010) -- RECHERCHEZ VOS GENRES PRÉFÉRÉS -- GTA VI vs CYBERPUNK 2 -- </div></div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker">💎 GAMETREND : LA CRÈME DE LA CRÈME DU JEU VIDÉO (SCORE > 85)</div>', unsafe_allow_html=True)
 
 # DUEL
-st.header("🔥 Duel de Légendes")
+st.header("🔥 Le Duel")
 col_v1, col_v2 = st.columns(2)
 with col_v1:
     if st.button("Voter GTA VI", use_container_width=True):
@@ -104,38 +103,33 @@ votes_t = st.session_state.vs['j1'] + st.session_state.vs['j2']
 perc = (st.session_state.vs['j1'] / votes_t * 100) if votes_t > 0 else 50
 st.progress(perc/100)
 
-# --- 6. CATALOGUE SANS RÉTRO (POST-2010) ---
+# --- 6. CATALOGUE DES MEILLEURS ---
 st.divider()
-st.header("🏆 Top Hits (Depuis 2010)")
+st.header("🏆 Sélection Élite par Genre")
 
 GENRES_MAP = {
     "Action": 31, "Aventure": 2, "RPG": 12, "Simulation": 13, 
-    "Sport": 14, "Course": 10, "FPS/Shooter": 5, "Combat": 4, 
+    "Sport": 14, "Course": 10, "Shooter": 5, "Combat": 4, 
     "Horreur": 19, "Indépendant": 32, "Stratégie": 15, "Plateforme": 8
 }
 
 col_s1, col_s2 = st.columns([2, 2])
+with col_s1: search_query = st.text_input("🔍 Rechercher un chef-d'œuvre :", placeholder="Ex: The Witcher, Elden Ring...")
+with col_s2: selected_genres = st.multiselect("🎯 Filtrer les meilleurs :", list(GENRES_MAP.keys()))
 
-with col_s1:
-    search_query = st.text_input("Rechercher un titre :", placeholder="Ex: GTA, FIFA, CoD...")
-
-with col_s2:
-    selected_genres = st.multiselect("Filtrer par genres :", list(GENRES_MAP.keys()))
-
-# Timestamp pour le 1er Janvier 2010 (1262304000)
+# LOGIQUE DE FILTRE : Toujours > 85 de note pour les genres
 if search_query:
-    query = f'search "{search_query}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
+    q = f'search "{search_query}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
 else:
-    # Filtres : Couverture présente + Note > 80 + Sorti après 2010
-    filters = ["cover != null", "total_rating >= 80", "first_release_date > 1262304000"]
+    # On force le total_rating >= 85 pour ne montrer que les jeux "Incroyables"
+    filters = ["cover != null", "total_rating >= 85", "first_release_date > 1262304000"]
     if selected_genres:
         genre_ids = [str(GENRES_MAP[g]) for g in selected_genres]
         filters.append(f"genres = ({','.join(genre_ids)})")
-        
-    where_clause = " & ".join(filters)
-    query = f"fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where {where_clause}; sort popularity desc; limit 12;"
+    
+    q = f"fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where {' & '.join(filters)}; sort popularity desc; limit 12;"
 
-games = fetch_data("games", query)
+games = fetch_data("games", q)
 
 if games:
     cols = st.columns(6)
@@ -143,28 +137,42 @@ if games:
         with cols[idx%6]:
             if 'cover' in g:
                 st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+                st.markdown(f"⭐ **{int(g.get('total_rating', 0))}/100**")
                 if st.button("Détails", key=f"btn_{g['id']}"):
                     st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
 else:
-    st.warning("Aucun hit trouvé avec ces critères.")
+    st.warning("Aucun jeu n'est assez bien noté pour cette catégorie ! (Score < 85)")
 
-# --- 7. CHAT & ADMIN ---
+# --- 7. SORTIES FUTURES ---
 st.divider()
-with st.expander("💬 Chat Communautaire"):
+st.header("🚀 Très Attendus (Futur)")
+q_future = "fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where first_release_date > 1735689600 & cover != null; sort popularity desc; limit 6;"
+futures = fetch_data("games", q_future)
+
+if futures:
+    cols_f = st.columns(6)
+    for idx, g in enumerate(futures):
+        with cols_f[idx]:
+            if 'cover' in g:
+                st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+                if st.button("Détails", key=f"f_{g['id']}"):
+                    st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
+
+# --- 8. CHAT & ADMIN ---
+st.divider()
+with st.expander("💬 Chat"):
     if not st.session_state.user_pseudo:
-        pseudo = st.text_input("Pseudo pour le chat :")
-        if st.button("Valider"): st.session_state.user_pseudo = pseudo; st.rerun()
+        pseudo = st.text_input("Pseudo :")
+        if st.button("Rejoindre"): st.session_state.user_pseudo = pseudo; st.rerun()
     else:
-        msg = st.text_input(f"Message ({st.session_state.user_pseudo}) :")
+        msg = st.text_input(f"Message de {st.session_state.user_pseudo} :")
         if st.button("Envoyer") and msg:
             if not any(w in msg.lower() for w in BAD_WORDS):
                 st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": msg, "reply": None})
                 sauver_data(DB_FILE, st.session_state.comments); st.rerun()
-        
         for c in st.session_state.comments[::-1]:
             st.write(f"**{c['user']}** : {c['msg']}")
-            if c.get('reply'):
-                st.markdown(f"<div class='admin-reply'><span class='badge-admin'>ADMIN</span>{c['reply']}</div>", unsafe_allow_html=True)
+            if c.get('reply'): st.markdown(f"<div class='admin-reply'>**ADMIN** : {c['reply']}</div>", unsafe_allow_html=True)
 
 with st.expander("🛠️ Admin"):
     if st.text_input("Code", type="password") == "628316":
