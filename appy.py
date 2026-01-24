@@ -113,21 +113,40 @@ if jeux:
         with cols[i % 6]:
             st.image("https:" + j['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
             st.write(j['name'])
-# --- 8. ZONE ADMIN DISCRÈTE (À LA FIN) ---
-with st.sidebar:
-    st.title("🛡️ Espace Maître")
-    code = st.text_input("Code secret :", type="password")
+# --- 8. ZONE ADMIN TOUT EN BAS ---
+st.divider()
+with st.expander("🛠️ Accès Administration"):
+    code = st.text_input("Code secret :", type="password", key="master_code")
     
     if code == "628316":
-        st.success("Mode Admin activé")
-        st.subheader("Répondre aux messages")
+        st.success("Mode Admin activé 🛡️")
+        st.subheader("Messages en attente de réponse :")
         
-        # On parcourt les messages pour pouvoir y répondre
         for i, c in enumerate(st.session_state.comments):
-            if not c.get('reply'): # On ne montre que ceux qui n'ont pas de réponse
-                with st.expander(f"De {c['user']} : {c['msg'][:20]}..."):
-                    rep_admin = st.text_input("Ta réponse :", key=f"admin_rep_{i}")
-                    if st.button("Envoyer la réponse", key=f"admin_btn_{i}"):
-                        st.session_state.comments[i]['reply'] = rep_admin
-                        sauver_data(DB_FILE, st.session_state.comments)
-                        st.rerun()
+            if not c.get('reply'):
+                st.info(f"**{c['user']}** a dit : {c['msg']}")
+                rep_admin = st.text_input("Ta réponse :", key=f"admin_rep_{i}")
+                if st.button("Poster la réponse", key=f"admin_btn_{i}"):
+                    st.session_state.comments[i]['reply'] = rep_admin
+                    sauver_data(DB_FILE, st.session_state.comments)
+                    st.rerun()
+    elif code != "":
+        st.error("Code incorrect")
+# --- 8. ZONE ADMIN TOUT EN BAS ---
+st.divider()
+with st.expander("🛠️ Accès Administration"):
+    code = st.text_input("Code secret :", type="password", key="master_code")
+    
+    if code == "628316":
+        st.success("Mode Admin activé 🛡️")
+        st.subheader("Messages en attente de réponse :")
+        
+        for i, c in enumerate(st.session_state.comments):
+            if not c.get('reply'):
+                st.info(f"**{c['user']}** a dit : {c['msg']}")
+                rep_admin = st.text_input("Ta réponse :", key=f"admin_rep_{i}")
+                if st.button("Poster la réponse", key=f"admin_btn_{i}"):
+                    st.session_state.comments[i]['reply'] = rep_admin
+                    sauver_data(DB_FILE, st.session_state.comments)
+                    st.rerun()
+    
