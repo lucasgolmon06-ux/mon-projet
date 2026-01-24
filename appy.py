@@ -1,13 +1,15 @@
-import streamlit as st
+Import streamlit as st
 import requests
 import json
 import os
 
-# --- 1. CONFIGURATION ---
+# --- 1. CONFIGURATION & DONNÉES ---
 CLIENT_ID = '21ely20t5zzbxzby557r34oi16j4hh'
 CLIENT_SECRET = 'n0i3u05gs9gmknoho2sed9q3vfn1y3'
 DB_FILE = "data_comms.json"
 VERSUS_FILE = "versus_stats.json"
+
+BAD_WORDS = ["merde", "connard", "fdp", "salope", "pute", "encule", "con"]
 
 def charger_data(file, default=[]):
     if os.path.exists(file):
@@ -21,111 +23,131 @@ def sauver_data(file, data):
 
 @st.cache_data(ttl=3600)
 def get_access_token():
-    auth_url = "https://id.twitch.tv/oauth2/token"
-    params = {'client_id': CLIENT_ID, 'client_secret': CLIENT_SECRET, 'grant_type': 'client_credentials'}
-    res = requests.post(auth_url, params=params)
+    auth_url = f"https://id.twitch.tv/oauth2/token?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&grant_type=client_credentials"
+    res = requests.post(auth_url)
     return res.json().get('access_token')
 
 def fetch_data(endpoint, query):
     token = get_access_token()
-    headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {token}', 'Content-Type': 'text/plain'}
+    headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {token}'}
     res = requests.post(f"https://api.igdb.com/v4/{endpoint}", headers=headers, data=query)
-    return res.json() if res.status_code == 200 else []
+    return res.json()
 
 # --- 2. INITIALISATION ---
-if 'page' not in st.session_state: st.session_state.page = "home"
-if 'selected_game' not in st.session_state: st.session_state.selected_game = None
 if 'comments' not in st.session_state: st.session_state.comments = charger_data(DB_FILE)
 if 'vs' not in st.session_state: st.session_state.vs = charger_data(VERSUS_FILE, {"j1": 0, "j2": 0})
+if 'user_pseudo' not in st.session_state: st.session_state.user_pseudo = None
+if 'page' not in st.session_state: st.session_state.page = "home"
+if 'selected_game' not in st.session_state: st.session_state.selected_game = None
 
-# --- 3. STYLE CSS (DISCRET PREMIUM) ---
-st.set_page_config(page_title="GameTrend", layout="wide")
+# --- 3. STYLE CSS ---
+st.set_page_config(page_title="GameTrend 2026", layout="wide")
 st.markdown("""
     <style>
-    .stApp { background: radial-gradient(circle at top, #000d26 0%, #00050d 100%); color: #e0e0e0; }
-    h1, h2 { font-weight: 300; color: #ffffff; letter-spacing: -0.5px; }
-    .stButton>button { 
-        background: linear-gradient(to bottom right, #003366, #000000); 
-        color: white; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; 
-    }
-    .stButton>button:hover { border-color: #00d4ff; color: #00d4ff; }
-    .news-bar { font-size: 0.8rem; color: #666; text-align: center; border-bottom: 1px solid #111; padding: 10px; margin-bottom: 20px; }
-    .chat-card { background: rgba(255,255,255,0.03); padding: 10px; border-radius: 5px; margin-bottom: 5px; border-left: 3px solid #003366; }
+    .stApp { background-color: #00051d; color: white; }
+    .news-ticker { background: #0072ce; color: white; padding: 12px; font-weight: bold; overflow: hidden; white-space: nowrap; border-radius: 5px; margin-bottom: 20px;}
+    .news-text { display: inline-block; padding-left: 100%; animation: ticker 25s linear infinite; }
+    @keyframes ticker { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
+    .admin-reply { background: #1a1a00; border-left: 5px solid #ffcc00; padding: 10px; margin-left: 30px; border-radius: 8px; color: #ffcc00; margin-top:5px; }
+    .badge-admin { background: linear-gradient(45deg, #ffd700, #ff8c00); color: black; padding: 2px 8px; border-radius: 4px; font-weight: bold; margin-right: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. NAVIGATION : DÉTAILS ---
+# --- 4. NAVIGATION : PAGE DÉTAILS ---
 if st.session_state.page == "details" and st.session_state.selected_game:
     g = st.session_state.selected_game
-    if st.button("← Retour"):
+    if st.button("⬅️ RETOUR À L'ACCUEIL"):
         st.session_state.page = "home"; st.rerun()
-    st.title(g['name'])
-    c1, c2 = st.columns([2, 1])
-    with c1:
-        if 'videos' in g: st.video(f"https://www.youtube.com/watch?v={g['videos'][0]['video_id']}")
-        elif 'screenshots' in g: st.image("https:" + g['screenshots'][0]['url'].replace('t_thumb', 't_720p'), use_container_width=True)
-    with c2:
-        if 'cover' in g: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), width=250)
-        st.write(f"**Score:** {int(g.get('total_rating', 0))}/100")
-        st.caption(g.get('summary', ''))
+    
+    st.title(f"🎮 {g['name']}")
+    c_vid, c_desc = st.columns([2, 1])
+    
+    with c_vid:
+        if 'videos' in g:
+            st.subheader("📺 Trailer Officiel")
+            st.video(f"https://www.youtube.com/watch?v={g['videos'][0]['video_id']}")
+        if 'screenshots' in g:
+            st.subheader("📸 Captures de Gameplay")
+            for ss in g['screenshots'][:3]:
+                st.image("https:" + ss['url'].replace('t_thumb', 't_720p'), use_container_width=True)
+    
+    with c_desc:
+        st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+        st.metric("SCORE IGDB", f"{int(g.get('total_rating', 0))}/100")
+        st.info(g.get('summary', 'Aucun résumé.'))
     st.stop()
 
 # --- 5. PAGE ACCUEIL ---
-st.markdown('<div class="news-bar">GT 2026 // BASE DE DONNÉES TEMPS RÉEL // VOTEZ POUR LE CHOC DES TITANS</div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker"><div class="news-text">🚀 GAMETREND 2026 -- RECHERCHEZ VOS JEUX -- GTA VI vs CYBERPUNK 2 -- VOTEZ MAINTENANT ! --</div></div>', unsafe_allow_html=True)
 
 # SECTION DUEL
-st.subheader("Duel : GTA VI vs CYBERPUNK 2")
-cv1, cv2 = st.columns(2)
-with cv1:
+st.header("🔥 Le Choc des Titans")
+col_v1, col_v2 = st.columns(2)
+with col_v1:
     if st.button("Voter GTA VI", use_container_width=True):
         st.session_state.vs['j1']+=1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
-with cv2:
+with col_v2:
     if st.button("Voter CYBERPUNK 2", use_container_width=True):
         st.session_state.vs['j2']+=1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
-t = st.session_state.vs['j1'] + st.session_state.vs['j2']
-p = (st.session_state.vs['j1']/t*100) if t>0 else 50
-st.progress(p/100)
 
-# SECTION CATALOGUE
+votes_t = st.session_state.vs['j1'] + st.session_state.vs['j2']
+perc = (st.session_state.vs['j1'] / votes_t * 100) if votes_t > 0 else 50
+st.progress(perc/100)
+st.markdown(f"<p style='text-align:center;'>GTA VI : {int(perc)}% | CYBERPUNK 2 : {int(100-perc)}%</p>", unsafe_allow_html=True)
+
+# SECTION CHAT
 st.divider()
-user_search = st.text_input("🔍 Rechercher un jeu...", placeholder="Entrez un titre...")
+st.header("💬 Le Chat")
+if not st.session_state.user_pseudo:
+    pseudo_input = st.text_input("Entre ton pseudo :")
+    if st.button("Rejoindre"): st.session_state.user_pseudo = pseudo_input; st.rerun()
+else:
+    with st.form("msg_form", clear_on_submit=True):
+        txt = st.text_input(f"Message de {st.session_state.user_pseudo}")
+        if st.form_submit_button("Envoyer") and txt:
+            if not any(w in txt.lower().split() for w in BAD_WORDS):
+                st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": txt, "reply": None})
+                sauver_data(DB_FILE, st.session_state.comments); st.rerun()
 
-def display_grid(query):
-    jeux = fetch_data("games", query)
-    if jeux:
-        cols = st.columns(6)
-        for idx, j in enumerate(jeux):
-            with cols[idx%6]:
-                if 'cover' in j: st.image("https:" + j['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                st.write(f"<p style='font-size:0.8rem;'>{j['name']}</p>", unsafe_allow_html=True)
-                if st.button("Détails", key=f"d_{j['id']}"):
-                    st.session_state.selected_game = j; st.session_state.page = "details"; st.rerun()
+for c in st.session_state.comments[::-1]:
+    st.write(f"**{c['user']}** : {c['msg']}")
+    if c.get('reply'):
+        st.markdown(f"<div class='admin-reply'><span class='badge-admin'>ADMIN</span>{c['reply']}</div>", unsafe_allow_html=True)
+
+# --- 6. CATALOGUE & BARRE DE RECHERCHE ---
+st.divider()
+st.header("🔍 Catalogue & Recherche")
+
+# LA BARRE DE RECHERCHE
+user_search = st.text_input("Tape ici pour chercher un jeu précisément :", placeholder="Ex: FIFA 26, Elden Ring, Mario...")
 
 if user_search:
-    display_grid(f'search "{user_search}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12;')
+    # Recherche IGDB
+    q = f'search "{user_search}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
 else:
-    tabs = st.tabs(["🔥 Tendances", "🆕 Prochainement", "🕹️ Classiques"])
-    with tabs[0]: display_grid("fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; sort popularity desc; limit 12; where cover != null;")
-    with tabs[1]: display_grid("fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where first_release_date > 1735689600; sort popularity desc; limit 12; where cover != null;")
-    with tabs[2]: display_grid("fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where total_rating > 85; sort popularity desc; limit 12; where cover != null;")
+    # Filtre Console classique
+    plats = {"PS5": 167, "Xbox Series X": 169, "Switch": 130, "PC": 6}
+    choice = st.selectbox("Ou choisis une console :", list(plats.keys()))
+    q = f"fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where platforms = ({plats[choice]}) & cover != null; sort popularity desc; limit 12;"
 
-# SECTION FORUM
+games = fetch_data("games", q)
+if games:
+    cols = st.columns(6)
+    for idx, g in enumerate(games):
+        with cols[idx%6]:
+            st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+            if st.button("Détails", key=f"btn_{g['id']}"):
+                st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
+
+# --- 7. ADMIN ---
 st.divider()
-with st.expander("💬 Forum & Discussions"):
-    msg = st.text_input("Votre message :")
-    if st.button("Envoyer") and msg:
-        st.session_state.comments.append({"user": "Joueur", "msg": msg, "reply": None})
-        sauver_data(DB_FILE, st.session_state.comments); st.rerun()
-    for c in st.session_state.comments[::-1]:
-        st.markdown(f"<div class='chat-card'><b>{c['user']}</b>: {c['msg']}</div>", unsafe_allow_html=True)
-        if c.get('reply'):
-            st.info(f"Admin: {c['reply']}")
-
-# SECTION ADMIN (CACHÉE)
-with st.expander("🛠️"):
-    if st.text_input("Code", type="password") == "628316":
+with st.expander("🛠️ Administration"):
+    if st.text_input("Mot de passe admin", type="password") == "628316":
         for i, c in enumerate(st.session_state.comments):
-            st.write(f"{c['msg']}")
-            rep = st.text_input("Réponse", key=f"r_{i}")
-            if st.button("Valider", key=f"b_{i}"):
+            st.write(f"{c['user']}: {c['msg']}")
+            if st.button("Supprimer", key=f"del_{i}"):
+                st.session_state.comments.pop(i); sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+            rep = st.text_input("Ta réponse", key=f"rep_{i}")
+            if st.button("Répondre", key=f"b_{i}"):
                 st.session_state.comments[i]['reply'] = rep; sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+Rajoute des couleurs
