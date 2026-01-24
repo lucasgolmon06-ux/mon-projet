@@ -70,13 +70,13 @@ if st.session_state.page == "details" and st.session_state.selected_game:
             st.video(f"https://www.youtube.com/watch?v={g['videos'][0]['video_id']}")
         
         if 'screenshots' in g:
-            st.subheader("📸 GAMEPLAY (IMAGERIE)")
+            st.subheader("📸 GAMEPLAY")
             for ss in g['screenshots'][:3]:
                 st.image("https:" + ss['url'].replace('t_thumb', 't_720p'), use_container_width=True)
 
     with col_side:
         st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-        st.metric(label="⭐ NOTE GLOBALE", value=f"{int(g.get('total_rating', 0))}/100")
+        st.metric(label="⭐ NOTE", value=f"{int(g.get('total_rating', 0))}/100")
         st.subheader("📝 RÉSUMÉ")
         st.write(g.get('summary', 'Aucun résumé disponible.'))
     st.stop()
@@ -118,21 +118,21 @@ for c in st.session_state.comments[::-1]:
     st.markdown(f"**{c['user']}** : {c['msg']}")
     if c.get('reply'): st.markdown(f"<div class='admin-reply'><span class='badge-admin'>ADMIN</span>{c['reply']}</div>", unsafe_allow_html=True)
 
-# --- CATALOGUE & RECHERCHE (FUSIONNÉ) ---
+# --- CATALOGUE & RECHERCHE (FUSIONNÉ ET CORRIGÉ) ---
 st.divider()
-st.header("🎮 Recherche de Jeux")
+st.header("🎮 Catalogue de Jeux")
 
-# BARRE DE RECHERCHE
-search_input = st.text_input("🔍 Tape le nom d'un jeu pour le trouver...", key="search_bar")
+# LA BARRE DE RECHERCHE EST ICI
+search_query = st.text_input("🔍 Tapez le nom d'un jeu ici pour le rechercher :", key="search_input_unique")
 
-if search_input:
-    # Si on cherche, on ignore la plateforme
-    query = f'search "{search_input}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
-else:
-    # Sinon on propose le top par console
+# CHOIX DE LA PLATEFORME (seulement si la recherche est vide)
+if not search_query:
     platforms = {"PS5": 167, "Xbox Series X": 169, "Switch": 130, "PC": 6}
-    p_choice = st.selectbox("Ou choisis une plateforme :", list(platforms.keys()))
+    p_choice = st.selectbox("Ou filtrez par console :", list(platforms.keys()))
     query = f"fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where platforms = ({platforms[p_choice]}) & cover != null; sort popularity desc; limit 12;"
+else:
+    # Si on tape quelque chose, on cherche dans toute la base IGDB
+    query = f'search "{search_query}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
 
 jeux = fetch_data("games", query)
 
@@ -140,11 +140,12 @@ if jeux:
     cols = st.columns(6)
     for i, j in enumerate(jeux):
         with cols[i % 6]:
-            st.image("https:" + j['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-            if st.button("🔎 Détails", key=f"det_{j['id']}"):
-                st.session_state.selected_game = j
-                st.session_state.page = "details"
-                st.rerun()
+            if 'cover' in j:
+                st.image("https:" + j['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+                if st.button("🔎 Détails", key=f"det_{j['id']}"):
+                    st.session_state.selected_game = j
+                    st.session_state.page = "details"
+                    st.rerun()
 
 # --- ADMIN ---
 st.divider()
