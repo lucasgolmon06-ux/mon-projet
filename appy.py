@@ -44,8 +44,8 @@ st.markdown("""
     .news-ticker { background: #0072ce; color: white; padding: 10px; font-weight: bold; overflow: hidden; white-space: nowrap; border-radius: 5px; }
     .news-text { display: inline-block; padding-left: 100%; animation: ticker 25s linear infinite; }
     @keyframes ticker { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
-    .admin-reply { background: #1a1a00; border-left: 5px solid #ffcc00; padding: 10px; margin-left: 30px; border-radius: 8px; margin-top: 5px; }
-    .badge-admin { background: linear-gradient(45deg, #ffd700, #ff8c00); color: black; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
+    .admin-reply { background: #1a1a00; border-left: 5px solid #ffcc00; padding: 10px; margin-left: 30px; border-radius: 8px; margin-top: 5px; color: #ffcc00; }
+    .badge-admin { background: linear-gradient(45deg, #ffd700, #ff8c00); color: black; padding: 2px 8px; border-radius: 4px; font-weight: bold; margin-right: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -60,16 +60,13 @@ with v1:
     st.subheader("GTA VI")
     if st.button("Voter GTA VI"):
         st.session_state.vs['j1'] += 1
-        sauver_data(VERSUS_FILE, st.session_state.vs)
-        st.rerun()
-with vs_txt:
-    st.markdown("<h1 style='text-align:center;'>VS</h1>", unsafe_allow_html=True)
+        sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
+with vs_txt: st.markdown("<h1 style='text-align:center;'>VS</h1>", unsafe_allow_html=True)
 with v2:
     st.subheader("CYBERPUNK 2")
     if st.button("Voter CYBERPUNK 2"):
         st.session_state.vs['j2'] += 1
-        sauver_data(VERSUS_FILE, st.session_state.vs)
-        st.rerun()
+        sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
 
 total = st.session_state.vs['j1'] + st.session_state.vs['j2']
 p1 = (st.session_state.vs['j1'] / total * 100) if total > 0 else 50
@@ -82,27 +79,26 @@ st.header("💬 Communauté")
 if not st.session_state.user_pseudo:
     pseudo = st.text_input("Ton pseudo :")
     if st.button("Rejoindre le chat"):
-        st.session_state.user_pseudo = pseudo
-        st.rerun()
+        st.session_state.user_pseudo = pseudo; st.rerun()
 else:
     with st.form("chat_form", clear_on_submit=True):
         message = st.text_input(f"Message ({st.session_state.user_pseudo}) :")
         if st.form_submit_button("Envoyer"):
-            st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": message, "reply": None})
-            sauver_data(DB_FILE, st.session_state.comments)
-            st.rerun()
+            if message:
+                st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": message, "reply": None})
+                sauver_data(DB_FILE, st.session_state.comments); st.rerun()
 
+# Affichage des messages pour tout le monde
 for c in st.session_state.comments[::-1]:
     st.markdown(f"**{c['user']}** : {c['msg']}")
     if c.get('reply'):
-        st.markdown(f"<div class='admin-reply'><span class='badge-admin'>ADMIN</span> {c['reply']}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='admin-reply'><span class='badge-admin'>ADMIN</span>{c['reply']}</div>", unsafe_allow_html=True)
 
-# --- 7. SECTION CATALOGUES ---
+# --- 7. CATALOGUES ---
 st.divider()
 st.header("🎮 Catalogues Jeux")
 platforms = {"PS5": 167, "Xbox Series X": 169, "Switch": 130, "PC": 6}
 p_choice = st.selectbox("Console :", list(platforms.keys()))
-
 query = f"fields name, cover.url; where platforms = ({platforms[p_choice]}) & cover != null; sort total_rating desc; limit 12;"
 jeux = fetch_data("games", query)
 
@@ -113,15 +109,27 @@ if jeux:
             st.image("https:" + j['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
             st.write(j['name'])
 
-# --- 8. ADMIN ---
+# --- 8. ADMIN (AVEC SUPPRESSION ET RÉPONSE) ---
 st.divider()
 with st.expander("🛠️ Admin"):
     if st.text_input("Code :", type="password") == "628316":
         for i, c in enumerate(st.session_state.comments):
+            col_msg, col_del = st.columns([0.9, 0.1])
+            with col_msg:
+                st.write(f"**{c['user']}** : {c['msg']}")
+            with col_del:
+                # LA CROIX POUR SUPPRIMER
+                if st.button("❌", key=f"del_{i}"):
+                    st.session_state.comments.pop(i)
+                    sauver_data(DB_FILE, st.session_state.comments)
+                    st.rerun()
+            
+            # CHAMP POUR RÉPONDRE
             if not c.get('reply'):
-                with st.expander(f"Répondre à {c['user']}"):
-                    ans = st.text_input("Réponse :", key=f"ans_{i}")
-                    if st.button("Poster", key=f"btn_{i}"):
-                        st.session_state.comments[i]['reply'] = ans
-                        sauver_data(DB_FILE, st.session_state.comments)
-                        st.rerun()
+                ans = st.text_input("Répondre au message :", key=f"ans_{i}")
+                if st.button("Valider la réponse", key=f"btn_{i}"):
+                    st.session_state.comments[i]['reply'] = ans
+                    sauver_data(DB_FILE, st.session_state.comments)
+                    st.rerun()
+            else:
+                st.write(f"Réponse actuelle : {c['reply']}")
