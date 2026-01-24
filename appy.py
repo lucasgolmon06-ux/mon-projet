@@ -1,8 +1,8 @@
+1
 import streamlit as st
 import requests
 import json
 import os
-import time
 
 # --- 1. CONFIGURATION ---
 CLIENT_ID = '21ely20t5zzbxzby557r34oi16j4hh'
@@ -62,6 +62,7 @@ with v1:
     if st.button("Voter GTA VI"):
         st.session_state.vs['j1'] += 1
         sauver_data(VERSUS_FILE, st.session_state.vs)
+        st.rerun()
 with vs_txt:
     st.markdown("<h1 style='text-align:center;'>VS</h1>", unsafe_allow_html=True)
 with v2:
@@ -69,6 +70,7 @@ with v2:
     if st.button("Voter CYBERPUNK 2"):
         st.session_state.vs['j2'] += 1
         sauver_data(VERSUS_FILE, st.session_state.vs)
+        st.rerun()
 
 total = st.session_state.vs['j1'] + st.session_state.vs['j2']
 p1 = (st.session_state.vs['j1'] / total * 100) if total > 0 else 50
@@ -107,7 +109,7 @@ jeux = fetch_data("games", query)
 
 if jeux:
     cols = st.columns(6)
-    for i, j en enumerate(jeux):
+    for i, j in enumerate(jeux):
         with cols[i % 6]:
             st.image("https:" + j['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
             st.write(j['name'])
