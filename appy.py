@@ -9,6 +9,8 @@ CLIENT_SECRET = 'n0i3u05gs9gmknoho2sed9q3vfn1y3'
 DB_FILE = "data_comms.json"
 VERSUS_FILE = "versus_stats.json"
 
+BAD_WORDS = ["merde", "connard", "fdp", "salope", "pute", "encule", "con"]
+
 def charger_data(file, default=[]):
     if os.path.exists(file):
         try:
@@ -21,9 +23,8 @@ def sauver_data(file, data):
 
 @st.cache_data(ttl=3600)
 def get_access_token():
-    auth_url = "https://id.twitch.tv/oauth2/token"
-    params = {'client_id': CLIENT_ID, 'client_secret': CLIENT_SECRET, 'grant_type': 'client_credentials'}
-    res = requests.post(auth_url, params=params)
+    auth_url = f"https://id.twitch.tv/oauth2/token?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&grant_type=client_credentials"
+    res = requests.post(auth_url)
     return res.json().get('access_token')
 
 def fetch_data(endpoint, query):
@@ -33,99 +34,109 @@ def fetch_data(endpoint, query):
     return res.json() if res.status_code == 200 else []
 
 # --- 2. INITIALISATION ---
-if 'page' not in st.session_state: st.session_state.page = "home"
-if 'selected_game' not in st.session_state: st.session_state.selected_game = None
 if 'comments' not in st.session_state: st.session_state.comments = charger_data(DB_FILE)
 if 'vs' not in st.session_state: st.session_state.vs = charger_data(VERSUS_FILE, {"j1": 0, "j2": 0})
+if 'user_pseudo' not in st.session_state: st.session_state.user_pseudo = None
+if 'page' not in st.session_state: st.session_state.page = "home"
+if 'selected_game' not in st.session_state: st.session_state.selected_game = None
 
-# --- 3. STYLE CSS (DISCRET PREMIUM) ---
-st.set_page_config(page_title="GameTrend", layout="wide")
+# --- 3. STYLE CSS (ÉPURÉ) ---
+st.set_page_config(page_title="GameTrend 2026", layout="wide")
 st.markdown("""
     <style>
-    .stApp { background: radial-gradient(circle at top, #000d26 0%, #00050d 100%); color: #e0e0e0; }
-    h1, h2 { font-weight: 300; color: #ffffff; letter-spacing: -0.5px; }
-    .stButton>button { 
-        background: linear-gradient(to bottom right, #003366, #000000); 
-        color: white; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; 
-    }
-    .stButton>button:hover { border-color: #00d4ff; color: #00d4ff; }
-    .news-bar { font-size: 0.8rem; color: #666; text-align: center; border-bottom: 1px solid #111; padding: 10px; margin-bottom: 20px; }
-    .chat-card { background: rgba(255,255,255,0.03); padding: 10px; border-radius: 5px; margin-bottom: 5px; border-left: 3px solid #003366; }
+    .stApp { background-color: #0b0e14; color: #ffffff; }
+    .news-ticker { border-bottom: 1px solid #333; padding: 10px; font-size: 0.9em; color: #888; text-align: center; margin-bottom: 20px;}
+    .stButton>button { background-color: #1a1c23; color: white; border: 1px solid #333; }
+    .stButton>button:hover { border-color: #ffffff; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. NAVIGATION : DÉTAILS ---
+# --- 4. PAGE DE DÉTAILS ---
 if st.session_state.page == "details" and st.session_state.selected_game:
     g = st.session_state.selected_game
-    if st.button("← Retour"):
+    if st.button("← RETOUR"):
         st.session_state.page = "home"; st.rerun()
     st.title(g['name'])
     c1, c2 = st.columns([2, 1])
     with c1:
         if 'videos' in g: st.video(f"https://www.youtube.com/watch?v={g['videos'][0]['video_id']}")
-        elif 'screenshots' in g: st.image("https:" + g['screenshots'][0]['url'].replace('t_thumb', 't_720p'), use_container_width=True)
+        if 'screenshots' in g:
+            for ss in g['screenshots'][:2]: st.image("https:" + ss['url'].replace('t_thumb', 't_720p'), use_container_width=True)
     with c2:
-        if 'cover' in g: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), width=250)
+        if 'cover' in g: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
         st.write(f"**Score:** {int(g.get('total_rating', 0))}/100")
-        st.caption(g.get('summary', ''))
+        st.write(g.get('summary', 'Pas de résumé.'))
     st.stop()
 
-# --- 5. PAGE ACCUEIL ---
-st.markdown('<div class="news-bar">GT 2026 // BASE DE DONNÉES TEMPS RÉEL // VOTEZ POUR LE CHOC DES TITANS</div>', unsafe_allow_html=True)
+# --- 5. ACCUEIL ---
+st.markdown('<div class="news-ticker">GAMETREND // ANALYSE GENRES & CATÉGORIES // 2026</div>', unsafe_allow_html=True)
 
-# SECTION DUEL
-st.subheader("Duel : GTA VI vs CYBERPUNK 2")
-cv1, cv2 = st.columns(2)
-with cv1:
-    if st.button("Voter GTA VI", use_container_width=True):
+# DUEL
+st.subheader("Duel de la semaine")
+c1, c2 = st.columns(2)
+with c1: 
+    if st.button("GTA VI", use_container_width=True):
         st.session_state.vs['j1']+=1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
-with cv2:
-    if st.button("Voter CYBERPUNK 2", use_container_width=True):
+with c2: 
+    if st.button("CYBERPUNK 2", use_container_width=True):
         st.session_state.vs['j2']+=1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
 t = st.session_state.vs['j1'] + st.session_state.vs['j2']
 p = (st.session_state.vs['j1']/t*100) if t>0 else 50
 st.progress(p/100)
 
-# SECTION CATALOGUE
+# --- 6. CATALOGUE PAR GENRE & CATÉGORIE ---
 st.divider()
-user_search = st.text_input("🔍 Rechercher un jeu...", placeholder="Entrez un titre...")
+st.subheader("Catalogue")
 
-def display_grid(query):
+def afficher_grille(query):
     jeux = fetch_data("games", query)
     if jeux:
         cols = st.columns(6)
-        for idx, j in enumerate(jeux):
-            with cols[idx%6]:
-                if 'cover' in j: st.image("https:" + j['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                st.write(f"<p style='font-size:0.8rem;'>{j['name']}</p>", unsafe_allow_html=True)
+        for i, j in enumerate(jeux):
+            with cols[i%6]:
+                if 'cover' in j:
+                    st.image("https:" + j['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+                st.write(f"<p style='font-size:0.9em;'><b>{j['name']}</b></p>", unsafe_allow_html=True)
                 if st.button("Détails", key=f"d_{j['id']}"):
                     st.session_state.selected_game = j; st.session_state.page = "details"; st.rerun()
 
-if user_search:
-    display_grid(f'search "{user_search}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12;')
-else:
-    tabs = st.tabs(["🔥 Tendances", "🆕 Prochainement", "🕹️ Classiques"])
-    with tabs[0]: display_grid("fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; sort popularity desc; limit 12; where cover != null;")
-    with tabs[1]: display_grid("fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where first_release_date > 1735689600; sort popularity desc; limit 12; where cover != null;")
-    with tabs[2]: display_grid("fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where total_rating > 85; sort popularity desc; limit 12; where cover != null;")
+# Recherche et Filtre par Genre
+col_search, col_genre = st.columns([2, 1])
+with col_search:
+    search = st.text_input("🔍 Rechercher un titre :")
+with col_genre:
+    # On remplace Plateforme par Genre
+    genres_dict = {"Action": 4, "Aventure": 31, "RPG": 12, "Shooter": 5, "Sport": 14, "Combat": 4}
+    genre_sel = st.selectbox("Filtrer par genre :", list(genres_dict.keys()))
 
-# SECTION FORUM
+if search:
+    q = f'search "{search}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
+    afficher_grille(q)
+else:
+    t1, t2, t3, t4 = st.tabs(["🏆 Meilleurs AAA", "✨ Indépendants", "🕹️ Rétro", "📂 Par Genre"])
+    with t1:
+        afficher_grille("fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where total_rating > 80 & category = 0; sort popularity desc; limit 12; where cover != null;")
+    with t2:
+        afficher_grille("fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where themes = (32); sort popularity desc; limit 12; where cover != null;")
+    with t3:
+        afficher_grille("fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where first_release_date < 946684800 & total_rating > 75; sort popularity desc; limit 12; where cover != null;")
+    with t4:
+        afficher_grille(f"fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where genres = ({genres_dict[genre_sel]}) & cover != null; sort popularity desc; limit 12;")
+
+# --- 7. FORUM ---
 st.divider()
-with st.expander("💬 Forum & Discussions"):
-    msg = st.text_input("Votre message :")
-    if st.button("Envoyer") and msg:
-        st.session_state.comments.append({"user": "Joueur", "msg": msg, "reply": None})
+with st.expander("💬 Forum"):
+    user_m = st.text_input("Votre message :")
+    if st.button("Envoyer") and user_m:
+        st.session_state.comments.append({"user": "Anonyme", "msg": user_m, "reply": None})
         sauver_data(DB_FILE, st.session_state.comments); st.rerun()
     for c in st.session_state.comments[::-1]:
-        st.markdown(f"<div class='chat-card'><b>{c['user']}</b>: {c['msg']}</div>", unsafe_allow_html=True)
-        if c.get('reply'):
-            st.info(f"Admin: {c['reply']}")
+        st.text(f"{c['msg']}")
 
-# SECTION ADMIN (CACHÉE)
+# --- 8. ADMIN ---
 with st.expander("🛠️"):
     if st.text_input("Code", type="password") == "628316":
         for i, c in enumerate(st.session_state.comments):
             st.write(f"{c['msg']}")
-            rep = st.text_input("Réponse", key=f"r_{i}")
-            if st.button("Valider", key=f"b_{i}"):
-                st.session_state.comments[i]['reply'] = rep; sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+            if st.button("Supprimer", key=f"del_{i}"):
+                st.session_state.comments.pop(i); sauver_data(DB_FILE, st.session_state.comments); st.rerun()
