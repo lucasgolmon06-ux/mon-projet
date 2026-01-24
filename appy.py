@@ -53,23 +53,21 @@ st.markdown("""
     .stButton>button {
         background: linear-gradient(to right, #004e92, #000428);
         color: white; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;
+        transition: 0.4s;
     }
-    /* Style pour la zone des prix */
-    .price-container {
-        background: rgba(255, 255, 255, 0.05);
+    .stButton>button:hover { border-color: #00f2ff; color: #00f2ff; background: transparent; }
+    .chat-msg { border-left: 2px solid rgba(255,255,255,0.1); padding-left: 15px; margin-bottom: 8px; font-size: 0.9rem; }
+    
+    /* Zone des prix discrète */
+    .price-box {
+        background: rgba(255, 255, 255, 0.03);
         padding: 15px;
-        border-radius: 8px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 5px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        margin-top: 10px;
     }
-    .price-row {
-        display: flex;
-        justify-content: space-between;
-        padding: 8px 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-    .price-row:last-child { border-bottom: none; }
-    .platform-name { color: #aaa; font-size: 0.9rem; }
-    .platform-price { color: #ffffff; font-weight: bold; }
+    .price-line { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+    .price-line:last-child { border-bottom: none; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -81,45 +79,29 @@ if st.session_state.page == "details" and st.session_state.selected_game:
     
     st.title(g['name'])
     c1, c2 = st.columns([2, 1])
-    
     with c1:
         if 'videos' in g: st.video(f"https://www.youtube.com/watch?v={g['videos'][0]['video_id']}")
-        if 'screenshots' in g: st.image("https:" + g['screenshots'][0]['url'].replace('t_thumb', 't_720p'), use_container_width=True)
+        if 'screenshots' in g: st.image("https:" + g['screenshots'][0]['url'].replace('t_thumb', 't_720p'))
         st.write("### Résumé")
-        st.write(g.get('summary', 'Aucune description disponible.'))
-        
+        st.caption(g.get('summary', 'Aucune description disponible.'))
     with c2:
-        if 'cover' in g: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+        if 'cover' in g: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'))
         
-        # SECTION PRIX PAR PLATEFORME
-        st.write("### 💰 Tarifs de sortie")
+        # AJOUT DES PRIX UNIQUEMENT ICI
+        st.write("### 💰 Prix indicatifs")
         st.markdown(f"""
-            <div class="price-container">
-                <div class="price-row">
-                    <span class="platform-name">PlayStation 5</span>
-                    <span class="platform-price">79.99€</span>
-                </div>
-                <div class="price-row">
-                    <span class="platform-name">Xbox Series X|S</span>
-                    <span class="platform-price">79.99€</span>
-                </div>
-                <div class="price-row">
-                    <span class="platform-name">PC Digital</span>
-                    <span class="platform-price">69.99€</span>
-                </div>
-                <div class="price-row">
-                    <span class="platform-name">Nintendo Switch</span>
-                    <span class="platform-price">59.99€</span>
-                </div>
+            <div class="price-box">
+                <div class="price-line"><span>PlayStation 5</span><b>79.99€</b></div>
+                <div class="price-line"><span>Xbox Series X</span><b>79.99€</b></div>
+                <div class="price-line"><span>PC Digital</span><b>69.99€</b></div>
+                <div class="price-line"><span>Switch</span><b>59.99€</b></div>
             </div>
         """, unsafe_allow_html=True)
-        
-        st.divider()
-        st.metric("Score Communauté", f"{int(g.get('total_rating', 0))}/100")
+
     st.stop()
 
 # --- 5. ACCUEIL ---
-st.markdown('<div class="news-ticker">GAMETREND // VERSION 2026 // ANALYSE DES PRIX & TENDANCES</div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker">GAMETREND // VERSION 2026 // DATA BY IGDB</div>', unsafe_allow_html=True)
 
 # DUEL
 st.subheader("Duel : GTA VI vs CYBERPUNK 2")
@@ -143,16 +125,16 @@ def display_grid(query):
             with cols[idx%6]:
                 if 'cover' in g:
                     st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                if st.button("Détails & Prix", key=f"b_{g['id']}"):
+                if st.button("Détails", key=f"b_{g['id']}"):
                     st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
 
 if user_search:
-    display_grid(f'search "{user_search}"; fields name, cover.url, summary, videos.video_id, screenshots.url, total_rating; limit 12;')
+    display_grid(f'search "{user_search}"; fields name, cover.url, summary, videos.video_id, screenshots.url; limit 12;')
 else:
     t1, t2, t3 = st.tabs(["Populaires", "Attendus 2026", "Rétro"])
-    with t1: display_grid("fields name, cover.url, summary, videos.video_id, screenshots.url, total_rating; sort popularity desc; limit 12; where cover != null;")
-    with t2: display_grid("fields name, cover.url, summary, videos.video_id, screenshots.url, total_rating; where first_release_date > 1735689600; sort popularity desc; limit 12; where cover != null;")
-    with t3: display_grid("fields name, cover.url, summary, videos.video_id, screenshots.url, total_rating; where first_release_date < 946684800; sort popularity desc; limit 12; where cover != null;")
+    with t1: display_grid("fields name, cover.url, summary, videos.video_id, screenshots.url; sort popularity desc; limit 12; where cover != null;")
+    with t2: display_grid("fields name, cover.url, summary, videos.video_id, screenshots.url; where first_release_date > 1735689600; sort popularity desc; limit 12; where cover != null;")
+    with t3: display_grid("fields name, cover.url, summary, videos.video_id, screenshots.url; where first_release_date < 946684800; sort popularity desc; limit 12; where cover != null;")
 
 # CHAT DISCRET
 st.divider()
