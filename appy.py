@@ -116,28 +116,38 @@ for c in st.session_state.comments[::-1]:
 
 # --- 6. CATALOGUE & BARRE DE RECHERCHE ---
 st.divider()
-st.header("🔍 Catalogue & Recherche")
+st.header("🎮 Catalogue & Exploration")
 
-# LA BARRE DE RECHERCHE
-user_search = st.text_input("Tape ici pour chercher un jeu précisément :", placeholder="Ex: FIFA 26, Elden Ring, Mario...")
+# Fonction pour afficher les jeux en grille
+def display_game_grid(query):
+    games = fetch_data("games", query)
+    if games:
+        cols = st.columns(6)
+        for idx, g in enumerate(games):
+            with cols[idx%6]:
+                if 'cover' in g:
+                    st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+                    if st.button("Détails", key=f"btn_{g['id']}"):
+                        st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
+
+# LA BARRE DE RECHERCHE (Prioritaire)
+user_search = st.text_input("🔍 Rechercher un jeu précisément :", placeholder="Ex: Elden Ring, FIFA 26, Mario...")
 
 if user_search:
-    # Recherche IGDB
     q = f'search "{user_search}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
+    display_game_grid(q)
 else:
-    # Filtre Console classique
-    plats = {"PS5": 167, "Xbox Series X": 169, "Switch": 130, "PC": 6}
-    choice = st.selectbox("Ou choisis une console :", list(plats.keys()))
-    q = f"fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where platforms = ({plats[choice]}) & cover != null; sort popularity desc; limit 12;"
-
-games = fetch_data("games", q)
-if games:
-    cols = st.columns(6)
-    for idx, g in enumerate(games):
-        with cols[idx%6]:
-            st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-            if st.button("Détails", key=f"btn_{g['id']}"):
-                st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
+    # ONGLETS DE CATÉGORIES
+    t1, t2, t3, t4 = st.tabs(["🏆 Meilleurs AAA", "✨ Pépites Indés", "🆕 Attendus 2026", "🕹️ Légendes Rétro"])
+    
+    with t1:
+        display_game_grid("fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where total_rating > 85 & category = 0; sort popularity desc; limit 12;")
+    with t2:
+        display_game_grid("fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where genres = (32) & total_rating > 70; sort popularity desc; limit 12;")
+    with t3:
+        display_game_grid("fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where first_release_date >= 1735689600; sort popularity desc; limit 12;")
+    with t4:
+        display_game_grid("fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where first_release_date < 946684800 & total_rating > 80; sort popularity desc; limit 12;")
 
 # --- 7. ADMIN ---
 st.divider()
@@ -150,3 +160,6 @@ with st.expander("🛠️ Administration"):
             rep = st.text_input("Ta réponse", key=f"rep_{i}")
             if st.button("Répondre", key=f"b_{i}"):
                 st.session_state.comments[i]['reply'] = rep; sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+
+
+ 
