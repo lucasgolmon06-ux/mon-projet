@@ -1,4 +1,3 @@
-1
 import streamlit as st
 import requests
 import json
@@ -45,7 +44,7 @@ st.markdown("""
     .news-ticker { background: #0072ce; color: white; padding: 10px; font-weight: bold; overflow: hidden; white-space: nowrap; border-radius: 5px; }
     .news-text { display: inline-block; padding-left: 100%; animation: ticker 25s linear infinite; }
     @keyframes ticker { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
-    .admin-reply { background: #1a1a00; border-left: 5px solid #ffcc00; padding: 10px; margin-left: 30px; border-radius: 8px; }
+    .admin-reply { background: #1a1a00; border-left: 5px solid #ffcc00; padding: 10px; margin-left: 30px; border-radius: 8px; margin-top: 5px; }
     .badge-admin { background: linear-gradient(45deg, #ffd700, #ff8c00); color: black; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
@@ -113,40 +112,23 @@ if jeux:
         with cols[i % 6]:
             st.image("https:" + j['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
             st.write(j['name'])
+
 # --- 8. ZONE ADMIN TOUT EN BAS ---
 st.divider()
 with st.expander("🛠️ Accès Administration"):
-    code = st.text_input("Code secret :", type="password", key="master_code")
+    master_code = st.text_input("Code secret :", type="password", key="master_pwd")
     
-    if code == "628316":
+    if master_code == "628316":
         st.success("Mode Admin activé 🛡️")
-        st.subheader("Messages en attente de réponse :")
+        st.subheader("Répondre aux messages :")
         
         for i, c in enumerate(st.session_state.comments):
             if not c.get('reply'):
-                st.info(f"**{c['user']}** a dit : {c['msg']}")
+                st.info(f"**{c['user']}** : {c['msg']}")
                 rep_admin = st.text_input("Ta réponse :", key=f"admin_rep_{i}")
                 if st.button("Poster la réponse", key=f"admin_btn_{i}"):
                     st.session_state.comments[i]['reply'] = rep_admin
                     sauver_data(DB_FILE, st.session_state.comments)
                     st.rerun()
-    elif code != "":
+    elif master_code != "":
         st.error("Code incorrect")
-# --- 8. ZONE ADMIN TOUT EN BAS ---
-st.divider()
-with st.expander("🛠️ Accès Administration"):
-    code = st.text_input("Code secret :", type="password", key="master_code")
-    
-    if code == "628316":
-        st.success("Mode Admin activé 🛡️")
-        st.subheader("Messages en attente de réponse :")
-        
-        for i, c in enumerate(st.session_state.comments):
-            if not c.get('reply'):
-                st.info(f"**{c['user']}** a dit : {c['msg']}")
-                rep_admin = st.text_input("Ta réponse :", key=f"admin_rep_{i}")
-                if st.button("Poster la réponse", key=f"admin_btn_{i}"):
-                    st.session_state.comments[i]['reply'] = rep_admin
-                    sauver_data(DB_FILE, st.session_state.comments)
-                    st.rerun()
-    
