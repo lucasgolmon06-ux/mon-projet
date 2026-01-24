@@ -2,12 +2,12 @@ import streamlit as st
 import requests
 import json
 import os
+from datetime import datetime
 
 # --- 1. CONFIGURATION ---
 CLIENT_ID = '21ely20t5zzbxzby557r34oi16j4hh'
 CLIENT_SECRET = 'n0i3u05gs9gmknoho2sed9q3vfn1y3'
 DB_FILE = "data_comms.json"
-VERSUS_FILE = "versus_stats.json"
 
 def charger_data(file, default=[]):
     if os.path.exists(file):
@@ -19,7 +19,7 @@ def charger_data(file, default=[]):
 def sauver_data(file, data):
     with open(file, "w", encoding="utf-8") as f: json.dump(data, f, indent=4)
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600) # Mise à jour toutes les 1h
 def get_access_token():
     auth_url = f"https://id.twitch.tv/oauth2/token?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&grant_type=client_credentials"
     res = requests.post(auth_url)
@@ -33,143 +33,95 @@ def fetch_data(endpoint, query):
 
 # --- 2. INITIALISATION ---
 if 'comments' not in st.session_state: st.session_state.comments = charger_data(DB_FILE)
-if 'vs' not in st.session_state: st.session_state.vs = charger_data(VERSUS_FILE, {"j1": 0, "j2": 0})
 if 'page' not in st.session_state: st.session_state.page = "home"
-if 'selected_game' not in st.session_state: st.session_state.selected_game = None
 
 # --- 3. STYLE VISUEL CINÉMA ---
 st.set_page_config(page_title="GAMETREND", layout="wide")
 st.markdown("""
     <style>
-    .stApp {
-        background: radial-gradient(circle at center, #001233 0%, #000000 100%);
-        color: #ffffff;
-    }
-    h1, h2, h3 { letter-spacing: 5px; font-weight: 300; text-transform: uppercase; }
-    .news-ticker {
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        color: #d1d1d1;
-        padding: 10px;
-        font-size: 0.8rem;
-        text-align: center;
-        letter-spacing: 3px;
-    }
-    .chat-box {
-        background: rgba(255, 255, 255, 0.05);
-        padding: 20px;
-        border-radius: 4px;
-        margin-top: 20px;
-        margin-bottom: 40px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    .vs-card {
-        background: rgba(255, 255, 255, 0.02);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        padding: 40px;
-        border-radius: 4px;
-        text-align: center;
-        margin-bottom: 40px;
-    }
-    .stButton>button {
-        background: transparent;
-        color: white;
-        border: 1px solid rgba(255,255,255,0.3);
-        border-radius: 0px;
-        transition: 0.3s;
-        text-transform: uppercase;
-    }
-    .stButton>button:hover {
-        border-color: #00f2ff;
-        color: #00f2ff;
-    }
-    .badge-gold {
-        color: #ffd700;
-        border: 1px solid #ffd700;
-        padding: 2px 6px;
-        font-size: 0.7rem;
-        text-transform: uppercase;
-        margin-bottom: 8px;
-    }
+    .stApp { background: radial-gradient(circle at center, #001233 0%, #000000 100%); color: #ffffff; }
+    h1, h2, h3 { letter-spacing: 3px; font-weight: 300; text-transform: uppercase; }
+    .section-box { border: 1px solid rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 4px; background: rgba(255, 255, 255, 0.02); margin-bottom: 20px; }
+    .news-card { border-left: 3px solid #00f2ff; padding-left: 15px; margin-bottom: 20px; background: rgba(0, 242, 255, 0.05); padding: 10px; }
+    .stButton>button { background: transparent; color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 0px; width: 100%; }
+    .stButton>button:hover { border-color: #00f2ff; color: #00f2ff; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. NAVIGATION DÉTAILS ---
-if st.session_state.page == "details" and st.session_state.selected_game:
-    g = st.session_state.selected_game
-    if st.button("← RETOUR"):
-        st.session_state.page = "home"; st.rerun()
+# --- 4. ACCUEIL ---
+st.title("GAMETREND // 2026")
+
+# --- SECTION NEWS (MISE À JOUR 1H) ---
+st.markdown('<div class="section-box">', unsafe_allow_html=True)
+st.subheader("📰 DERNIÈRES INFOS (MAJ 1H)")
+# On récupère les actus via les blogs IGDB/Web
+news_data = fetch_data("website_previews", "fields title, summary, url; limit 3;") 
+if news_data:
+    for news in news_data:
+        st.markdown(f"""
+        <div class="news-card">
+            <div style="color:#00f2ff; font-weight:bold; font-size:1.1rem;">{news.get('title', 'Info Gaming')}</div>
+            <div style="font-size:0.85rem; opacity:0.8;">{news.get('summary', 'Cliquez pour voir les détails de cette info...')}</div>
+        </div>
+        """, unsafe_allow_html=True)
+else:
+    st.info("Recherche de nouvelles actualités en cours...")
+st.markdown('</div>', unsafe_allow_html=True)
+
+# --- LAYOUT PRINCIPAL ---
+col_jeux, col_new = st.columns([3, 1])
+
+with col_jeux:
+    st.markdown('<div class="section-box">', unsafe_allow_html=True)
+    st.header("🎮 JEUX ÉLITE")
     
-    st.title(g['name'])
-    c1, c2 = st.columns([2, 1])
-    with c1:
-        if 'videos' in g: st.video(f"https://www.youtube.com/watch?v={g['videos'][0]['video_id']}")
-        elif 'screenshots' in g: st.image("https:" + g['screenshots'][0]['url'].replace('t_thumb', 't_720p'))
-    with c2:
-        if 'cover' in g: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'))
-        if g.get('total_rating'): st.metric("SCORE", f"{int(g['total_rating'])}/100")
-        st.markdown("### TARIFS")
-        st.markdown(f'<div style="background:rgba(255,255,255,0.05); padding:15px;">Console : 79.99€<br>PC : 69.99€</div>', unsafe_allow_html=True)
-        st.write(g.get('summary', ''))
-    st.stop()
-
-# --- 5. ACCUEIL ---
-st.markdown('<div class="news-ticker">GAMETREND // AAA & MASTERPIECES // 2026 EDITION</div>', unsafe_allow_html=True)
-
-# --- CHAT EN HAUT (MODE NORMAL) ---
-st.markdown('<div class="chat-box">', unsafe_allow_html=True)
-st.subheader("💬 SALON COMMUNAUTAIRE")
-msg = st.text_input("Message :", key="chat_input", label_visibility="collapsed", placeholder="Écrivez votre message ici...")
-if st.button("ENVOYER"):
-    if msg:
-        st.session_state.comments.append({"user": "Player", "msg": msg})
-        sauver_data(DB_FILE, st.session_state.comments); st.rerun()
-
-for c in st.session_state.comments[::-1][:5]: # Affiche les 5 derniers messages
-    st.markdown(f"<div style='font-size:0.9rem; margin-bottom:5px; border-left:2px solid #00f2ff; padding-left:10px;'>{c['msg']}</div>", unsafe_allow_html=True)
-st.markdown('</div>', unsafe_allow_html=True)
-
-# --- DUEL (CLASH) ---
-st.markdown('<div class="vs-card">', unsafe_allow_html=True)
-st.markdown("<h1>THE CLASH</h1>", unsafe_allow_html=True)
-cv1, cv_mid, cv2 = st.columns([2, 1, 2])
-with cv1:
-    st.markdown("### GTA VI")
-    if st.button("VOTE GTA VI", use_container_width=True):
-        st.session_state.vs['j1']+=1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
-with cv_mid:
-    st.markdown("<h2 style='text-align:center; color:#00f2ff; margin-top:35px;'>VS</h2>", unsafe_allow_html=True)
-with cv2:
-    st.markdown("### CYBERPUNK 2")
-    if st.button("VOTE CYBERPUNK 2", use_container_width=True):
-        st.session_state.vs['j2']+=1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
-
-v_total = st.session_state.vs['j1'] + st.session_state.vs['j2']
-p = (st.session_state.vs['j1'] / v_total * 100) if v_total > 0 else 50
-st.progress(p/100)
-st.markdown('</div>', unsafe_allow_html=True)
-
-# --- 6. CATALOGUE ÉLITE ---
-st.header("SÉLECTION PAR GENRE")
-GENRES_MAP = {"Action/Aventure": 31, "RPG": 12, "Simulation": 13, "Sport": 14, "Shooter": 5, "Combat": 4}
-
-c_f1, c_f2 = st.columns(2)
-with c_f1: s_query = st.text_input("RECHERCHE", placeholder="Nom du jeu...")
-with c_f2: s_genres = st.multiselect("GENRES", list(GENRES_MAP.keys()))
-
-filters = ["cover != null", "total_rating >= 85", "first_release_date > 1262304000"]
-if s_genres:
-    g_ids = [str(GENRES_MAP[g]) for g in s_genres]
-    filters.append(f"genres = ({','.join(g_ids)})")
-q = f"fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where {' & '.join(filters)}; sort popularity desc; limit 12;"
-
-games = fetch_data("games", q)
-
-if games:
-    cols = st.columns(6)
-    for i, g in enumerate(games):
-        with cols[i%6]:
-            if 'cover' in g:
+    GENRES_MAP = {"Action": 31, "RPG": 12, "Shooter": 5, "Horreur": 19}
+    selected_genre = st.selectbox("GENRE", ["Tous"] + list(GENRES_MAP.keys()))
+    
+    # Filtre Élite (>85 score + pas de vieux jeux)
+    filters = ["cover != null", "total_rating >= 85", "first_release_date > 1262304000"]
+    if selected_genre != "Tous":
+        filters.append(f"genres = ({GENRES_MAP[selected_genre]})")
+    
+    q_jeux = f"fields name, cover.url, total_rating; where {' & '.join(filters)}; sort popularity desc; limit 9;"
+    games = fetch_data("games", q_jeux)
+    
+    if games:
+        grid = st.columns(3)
+        for i, g in enumerate(games):
+            with grid[i%3]:
                 st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                if int(g.get('total_rating', 0)) >= 90: st.markdown('<span class="badge-gold">GOLD</span>', unsafe_allow_html=True)
-                if st.button("DETAILS", key=f"btn_{g['id']}"):
-                    st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
+                st.caption(f"{g['name']} - {int(g.get('total_rating', 0))}/100")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with col_new:
+    st.markdown('<div class="section-box">', unsafe_allow_html=True)
+    st.header("✨ NEW")
+    # Sorties très proches ou futures
+    new_games = fetch_data("games", "fields name, cover.url; where first_release_date > 1737742000 & cover != null; sort popularity desc; limit 4;")
+    for ng in new_games:
+        st.image("https:" + ng['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+        st.divider()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# --- SECTION BASSE (COMM & ADMIN) ---
+c_comm, c_admin = st.columns([3, 1])
+with c_comm:
+    st.markdown('<div class="section-box">', unsafe_allow_html=True)
+    st.subheader("💬 COMMENTAIRES")
+    msg = st.text_input("Message :", key="msg_input")
+    if st.button("PUBLIER"):
+        if msg:
+            st.session_state.comments.append({"msg": msg})
+            sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+    for c in st.session_state.comments[::-1][:3]:
+        st.markdown(f"<div style='color:#00f2ff; font-size:0.8rem;'>• {c['msg']}</div>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with c_admin:
+    st.markdown('<div class="section-box">', unsafe_allow_html=True)
+    st.subheader("🛠️ ADMIN")
+    if st.text_input("Code", type="password") == "628316":
+        if st.button("Vider"):
+            st.session_state.comments = []; sauver_data(DB_FILE, []); st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
