@@ -50,6 +50,9 @@ st.markdown("""
     @keyframes ticker { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
     .admin-reply { background: #1a1a00; border-left: 5px solid #ffcc00; padding: 10px; margin-left: 30px; border-radius: 8px; color: #ffcc00; margin-top:5px; }
     .badge-admin { background: linear-gradient(45deg, #ffd700, #ff8c00); color: black; padding: 2px 8px; border-radius: 4px; font-weight: bold; margin-right: 10px; }
+    /* Style zone de prix */
+    .price-card { background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; border: 1px solid #0072ce; margin-top: 10px; }
+    .price-line { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 5px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -75,6 +78,18 @@ if st.session_state.page == "details" and st.session_state.selected_game:
         st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
         st.metric("SCORE IGDB", f"{int(g.get('total_rating', 0))}/100")
         st.info(g.get('summary', 'Aucun résumé.'))
+        
+        # --- AJOUT DES PRIX ---
+        st.subheader("💰 Prix Indicatifs")
+        st.markdown("""
+            <div class="price-card">
+                <div class="price-line"><span>PlayStation 5</span><b>79.99€</b></div>
+                <div class="price-line"><span>Xbox Series X</span><b>79.99€</b></div>
+                <div class="price-line"><span>PC (Steam/Epic)</span><b>69.99€</b></div>
+                <div class="price-line"><span>Nintendo Switch</span><b>59.99€</b></div>
+            </div>
+        """, unsafe_allow_html=True)
+        
     st.stop()
 
 # --- 5. PAGE ACCUEIL ---
@@ -118,26 +133,34 @@ for c in st.session_state.comments[::-1]:
 st.divider()
 st.header("🔍 Catalogue & Recherche")
 
-# LA BARRE DE RECHERCHE
 user_search = st.text_input("Tape ici pour chercher un jeu précisément :", placeholder="Ex: FIFA 26, Elden Ring, Mario...")
 
 if user_search:
-    # Recherche IGDB
     q = f'search "{user_search}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
 else:
-    # Filtre Console classique
-    plats = {"PS5": 167, "Xbox Series X": 169, "Switch": 130, "PC": 6}
-    choice = st.selectbox("Ou choisis une console :", list(plats.keys()))
-    q = f"fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where platforms = ({plats[choice]}) & cover != null; sort popularity desc; limit 12;"
+    # --- REMPLACEMENT PLATEFORMES PAR GENRES ---
+    genres = {
+        "Action": 31, 
+        "Aventure": 2, 
+        "RPG (Rôle)": 12, 
+        "Sport": 14, 
+        "Course": 10, 
+        "FPS / Shooter": 5,
+        "Combat": 4,
+        "Horreur": 19
+    }
+    choice = st.selectbox("Ou choisis un genre :", list(genres.keys()))
+    q = f"fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where genres = ({genres[choice]}) & cover != null; sort popularity desc; limit 12;"
 
 games = fetch_data("games", q)
 if games:
     cols = st.columns(6)
     for idx, g in enumerate(games):
         with cols[idx%6]:
-            st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-            if st.button("Détails", key=f"btn_{g['id']}"):
-                st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
+            if 'cover' in g:
+                st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+                if st.button("Détails", key=f"btn_{g['id']}"):
+                    st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
 
 # --- 7. ADMIN ---
 st.divider()
