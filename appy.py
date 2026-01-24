@@ -43,7 +43,7 @@ st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
     h1 { font-size: 70px !important; text-align: center; font-weight: 900; color: #0072ce; }
-    h2 { border-left: 10px solid #0072ce; padding-left: 15px; margin-top: 40px; font-size: 40px !important; }
+    h2 { border-left: 10px solid #0072ce; padding-left: 15px; margin-top: 40px; font-size: 35px !important; text-transform: uppercase;}
     .news-ticker { background: #0072ce; color: white; padding: 15px; font-weight: bold; overflow: hidden; white-space: nowrap; border-radius: 5px; }
     .news-text { display: inline-block; padding-left: 100%; animation: ticker 25s linear infinite; }
     @keyframes ticker { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
@@ -53,29 +53,29 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 4. HEADER ---
-st.markdown('<div class="news-ticker"><div class="news-text">🚀 BIENVENUE SUR GAMETREND 2026 -- RECHERCHEZ VOS JEUX -- REGARDEZ LES TRAILERS -- VOTEZ AU DUEL -- NOUVELLES SECTIONS DISPONIBLES --</div></div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker"><div class="news-text">🚀 GAMETREND 2026 : RECHERCHEZ, CLIQUEZ, REGARDEZ LES BANDES-ANNONCES ET VOTEZ -- GTA VI vs CYBERPUNK 2 -- </div></div>', unsafe_allow_html=True)
 st.markdown("<h1>GAMETREND ULTIMATE</h1>", unsafe_allow_html=True)
 
 # --- 5. LE DUEL ---
-st.markdown("## 🔥 LE CHOC DES TITRES")
+st.markdown("## 🔥 LE CHOC : GTA VI VS CP2")
 v1, vs_txt, v2 = st.columns([2, 1, 2])
 with v1:
     st.markdown("<h3 style='text-align:center;'>GTA VI</h3>", unsafe_allow_html=True)
-    if st.button("Voter GTA", use_container_width=True):
+    if st.button("Voter GTA VI", use_container_width=True):
         st.session_state.vs['j1'] += 1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
 with vs_txt: st.markdown("<h1 style='text-align:center;'>VS</h1>", unsafe_allow_html=True)
 with v2:
     st.markdown("<h3 style='text-align:center;'>CYBERPUNK 2</h3>", unsafe_allow_html=True)
-    if st.button("Voter CP2", use_container_width=True):
+    if st.button("Voter CYBERPUNK 2", use_container_width=True):
         st.session_state.vs['j2'] += 1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
 
 total = st.session_state.vs['j1'] + st.session_state.vs['j2']
 st.progress(st.session_state.vs['j1'] / (total if total > 0 else 1))
 
-# --- 6. RECHERCHE INTERACTIVE ---
+# --- 6. RECHERCHE ---
 st.divider()
 st.markdown("## 🔎 RECHERCHER UN JEU")
-search = st.text_input("Tapez un nom...", placeholder="Ex: Elden Ring...")
+search = st.text_input("Tapez le nom d'un jeu...", placeholder="Ex: Call of Duty, FIFA...")
 if search:
     res_search = fetch_data(f'search "{search}"; fields name, cover.url, summary, videos.video_id, total_rating; limit 8; where cover != null;')
     if res_search:
@@ -83,23 +83,25 @@ if search:
         for i, g in enumerate(res_search):
             with cols[i%4]:
                 st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                if st.button(f"Infos : {g['name'][:15]}", key=f"search_{g['id']}"):
+                if st.button(f"VOIR INFOS : {g['name'][:15]}", key=f"s_{g['id']}"):
                     st.session_state.selected_game = g; st.rerun()
 
-# --- 7. ZONE D'INFOS (SYSTÈME DE CLIC + TRAILERS) ---
+# --- 7. INFOS DÉTAILLÉES (CLIC + TRAILERS) ---
 if st.session_state.selected_game:
     sel = st.session_state.selected_game
-    st.markdown(f"### 📽️ Focus sur : {sel['name']}")
+    st.markdown(f"### 📄 DÉTAILS : {sel['name']}")
     ci, ct = st.columns([1, 2])
     with ci: st.image("https:" + sel['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
     with ct:
-        st.write(f"**Note :** {int(sel.get('total_rating', 0))}/100")
-        st.write(sel.get('summary', 'Pas de résumé.'))
-        if 'videos' in sel: st.video(f"https://www.youtube.com/watch?v={sel['videos'][0]['video_id']}")
-    if st.button("Fermer"): st.session_state.selected_game = None; st.rerun()
+        st.write(f"**Score IGDB :** {int(sel.get('total_rating', 0))}/100")
+        st.write(f"**Résumé :** {sel.get('summary', 'Aucun résumé disponible.')}")
+        if 'videos' in sel:
+            st.write("**Bande-annonce :**")
+            st.video(f"https://www.youtube.com/watch?v={sel['videos'][0]['video_id']}")
+    if st.button("FERMER LES INFOS"): st.session_state.selected_game = None; st.rerun()
 
-# --- 8. LES SECTIONS DE 12 ---
-def afficher_section(titre, query):
+# --- 8. LES TOPS 12 (LES VRAIS) ---
+def section_12(titre, query):
     st.markdown(f"## {titre}")
     data = fetch_data(query)
     if data:
@@ -107,38 +109,39 @@ def afficher_section(titre, query):
         for i, g in enumerate(data):
             with cols[i%6]:
                 st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                if st.button(f"Voir : {g['name'][:10]}", key=f"{titre}_{g['id']}"):
+                if st.button(f"Infos : {g['name'][:10]}", key=f"{titre}_{g['id']}"):
                     st.session_state.selected_game = g; st.rerun()
 
-afficher_section("💎 12 MEILLEURS INDÉPENDANTS", "fields name, cover.url, summary, videos.video_id, total_rating; where themes = (32) & cover != null; sort total_rating desc; limit 12;")
-afficher_section("💰 12 LES PLUS ACHETÉS (POPULAIRES)", "fields name, cover.url, summary, videos.video_id, total_rating; where cover != null; sort popularity desc; limit 12;")
-afficher_section("❤️ 12 COUPS DE CŒUR COMMU", "fields name, cover.url, summary, videos.video_id, total_rating; where cover != null & total_rating > 85; sort hypes desc; limit 12;")
+section_12("🏆 TOP 12 LES PLUS VENDUS (POPULAIRES)", "fields name, cover.url, summary, videos.video_id, total_rating; sort popularity desc; limit 12; where cover != null;")
+section_12("💎 TOP 12 PÉPITES INDÉPENDANTES", "fields name, cover.url, summary, videos.video_id, total_rating; where genres = (32) & total_rating > 70; sort popularity desc; limit 12; where cover != null;")
+section_12("❤️ TOP 12 COUPS DE COEUR COMMU", "fields name, cover.url, summary, videos.video_id, total_rating; sort total_rating desc; limit 12; where cover != null & total_rating != null;")
 
-# --- 9. LE FORUM ---
+# --- 9. FORUM ---
 st.divider()
 st.markdown("## 💬 FORUM COMMUNAUTÉ")
 if not st.session_state.user_pseudo:
-    p = st.text_input("Pseudo :")
-    if st.button("Se connecter"): st.session_state.user_pseudo = p; st.rerun()
+    p = st.text_input("Ton Pseudo :")
+    if st.button("REJOINDRE LE CHAT"): st.session_state.user_pseudo = p; st.rerun()
 else:
     with st.form("chat"):
         m = st.text_input(f"Message ({st.session_state.user_pseudo})")
-        if st.form_submit_button("Envoyer"):
+        if st.form_submit_button("PUBLIER"):
             st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m, "reply": None})
             sauver_data(DB_FILE, st.session_state.comments); st.rerun()
 
 for c in st.session_state.comments[::-1]:
     st.markdown(f"<div class='msg-user'><b>{c['user']}</b> : {c['msg']}</div>", unsafe_allow_html=True)
-    if c.get('reply'): st.markdown(f"<div class='admin-reply'>🛡️ {c['reply']}</div>", unsafe_allow_html=True)
+    if c.get('reply'):
+        st.markdown(f"<div class='admin-reply'>🛡️ ADMIN : {c['reply']}</div>", unsafe_allow_html=True)
 
 # --- 10. ADMIN ---
 st.divider()
-with st.expander("🛠️ ADMIN"):
-    if st.text_input("Code :", type="password") == "628316":
+with st.expander("🛠️ ADMIN ACCESS"):
+    if st.text_input("Master Code :", type="password") == "628316":
         for i, c in enumerate(st.session_state.comments):
             if not c.get('reply'):
                 with st.expander(f"Répondre à {c['user']}"):
-                    ans = st.text_input("Réponse", key=f"ans_{i}")
-                    if st.button("Poster", key=f"btn_{i}"):
+                    ans = st.text_input("Réponse", key=f"adm_ans_{i}")
+                    if st.button("Répondre", key=f"adm_btn_{i}"):
                         st.session_state.comments[i]['reply'] = ans
                         sauver_data(DB_FILE, st.session_state.comments); st.rerun()
