@@ -9,6 +9,9 @@ CLIENT_SECRET = 'n0i3u05gs9gmknoho2sed9q3vfn1y3'
 DB_FILE = "data_comms.json"
 VERSUS_FILE = "versus_stats.json"
 
+# Liste noire simple (tu peux en rajouter)
+BAD_WORDS = ["merde", "connard", "fdp", "salope", "pute", "encule", "con"]
+
 def charger_data(file, default=[]):
     if os.path.exists(file):
         try:
@@ -35,6 +38,7 @@ def fetch_data(endpoint, query):
 if 'comments' not in st.session_state: st.session_state.comments = charger_data(DB_FILE)
 if 'vs' not in st.session_state: st.session_state.vs = charger_data(VERSUS_FILE, {"j1": 0, "j2": 0})
 if 'user_pseudo' not in st.session_state: st.session_state.user_pseudo = None
+if 'selected_game' not in st.session_state: st.session_state.selected_game = None
 
 # --- 3. STYLE CSS ---
 st.set_page_config(page_title="GameTrend 2026", layout="wide")
@@ -49,8 +53,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. BANDEAU & TITRE ---
-st.markdown('<div class="news-ticker"><div class="news-text">🚀 BIENVENUE SUR GAMETREND 2026 -- TOUTES LES NEWS JEUX VIDÉO EN TEMPS RÉEL -- GTA VI vs CYBERPUNK 2 -- </div></div>', unsafe_allow_html=True)
+# --- 4. BANDEAU ---
+st.markdown('<div class="news-ticker"><div class="news-text">🚀 GAMETREND 2026 -- CLIQUEZ SUR UN JEU POUR VOIR LE TRAILER -- CHAT MODÉRÉ AUTOMATIQUEMENT -- GTA VI vs CYBERPUNK 2 -- </div></div>', unsafe_allow_html=True)
 st.title("GameTrend Ultimate")
 
 # --- 5. SECTION DUEL ---
@@ -59,47 +63,46 @@ v1, vs_txt, v2 = st.columns([2, 1, 2])
 with v1:
     st.subheader("GTA VI")
     if st.button("Voter GTA VI"):
-        st.session_state.vs['j1'] += 1
-        sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
+        st.session_state.vs['j1'] += 1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
 with vs_txt: st.markdown("<h1 style='text-align:center;'>VS</h1>", unsafe_allow_html=True)
 with v2:
     st.subheader("CYBERPUNK 2")
     if st.button("Voter CYBERPUNK 2"):
-        st.session_state.vs['j2'] += 1
-        sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
+        st.session_state.vs['j2'] += 1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
 
 total = st.session_state.vs['j1'] + st.session_state.vs['j2']
 p1 = (st.session_state.vs['j1'] / total * 100) if total > 0 else 50
 st.progress(p1 / 100)
-st.write(f"📊 Score : {int(p1)}% vs {int(100-p1)}%")
 
-# --- 6. SECTION COMMUNAUTÉ ---
+# --- 6. SECTION COMMUNAUTÉ (AVEC ANTI-INSULTE) ---
 st.divider()
 st.header("💬 Communauté")
 if not st.session_state.user_pseudo:
     pseudo = st.text_input("Ton pseudo :")
-    if st.button("Rejoindre le chat"):
-        st.session_state.user_pseudo = pseudo; st.rerun()
+    if st.button("Rejoindre le chat"): st.session_state.user_pseudo = pseudo; st.rerun()
 else:
     with st.form("chat_form", clear_on_submit=True):
         message = st.text_input(f"Message ({st.session_state.user_pseudo}) :")
         if st.form_submit_button("Envoyer"):
-            if message:
+            # Vérification des insultes
+            if any(word in message.lower() for word in BAD_WORDS):
+                st.error("⚠️ Message bloqué : langage inapproprié.")
+            elif message:
                 st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": message, "reply": None})
                 sauver_data(DB_FILE, st.session_state.comments); st.rerun()
 
-# Affichage des messages pour tout le monde
 for c in st.session_state.comments[::-1]:
     st.markdown(f"**{c['user']}** : {c['msg']}")
     if c.get('reply'):
         st.markdown(f"<div class='admin-reply'><span class='badge-admin'>ADMIN</span>{c['reply']}</div>", unsafe_allow_html=True)
 
-# --- 7. CATALOGUES ---
+# --- 7. CATALOGUES AVEC INFOS + TRAILERS ---
 st.divider()
 st.header("🎮 Catalogues Jeux")
 platforms = {"PS5": 167, "Xbox Series X": 169, "Switch": 130, "PC": 6}
 p_choice = st.selectbox("Console :", list(platforms.keys()))
-query = f"fields name, cover.url; where platforms = ({platforms[p_choice]}) & cover != null; sort total_rating desc; limit 12;"
+
+query = f"fields name, cover.url, summary, videos.video_id, total_rating; where platforms = ({platforms[p_choice]}) & cover != null; sort total_rating desc; limit 12;"
 jeux = fetch_data("games", query)
 
 if jeux:
@@ -107,29 +110,36 @@ if jeux:
     for i, j in enumerate(jeux):
         with cols[i % 6]:
             st.image("https:" + j['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-            st.write(j['name'])
+            if st.button(f"Voir : {j['name'][:15]}", key=f"btn_{j['id']}"):
+                st.session_state.selected_game = j; st.rerun()
 
-# --- 8. ADMIN (AVEC SUPPRESSION ET RÉPONSE) ---
+# Affichage des détails du jeu sélectionné
+if st.session_state.selected_game:
+    g = st.session_state.selected_game
+    with st.container():
+        st.markdown(f"### ℹ️ {g['name']}")
+        c1, c2 = st.columns([1, 2])
+        with c1: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+        with c2:
+            st.write(f"**Note :** {int(g.get('total_rating', 0))}/100")
+            st.write(f"**Résumé :** {g.get('summary', 'Pas de résumé.')}")
+            if 'videos' in g:
+                st.write("**Bande-annonce :**")
+                st.video(f"https://www.youtube.com/watch?v={g['videos'][0]['video_id']}")
+        if st.button("Fermer les détails"): st.session_state.selected_game = None; st.rerun()
+
+# --- 8. ADMIN (SUPPRESSION + RÉPONSE) ---
 st.divider()
 with st.expander("🛠️ Admin"):
     if st.text_input("Code :", type="password") == "628316":
         for i, c in enumerate(st.session_state.comments):
-            col_msg, col_del = st.columns([0.9, 0.1])
-            with col_msg:
-                st.write(f"**{c['user']}** : {c['msg']}")
-            with col_del:
-                # LA CROIX POUR SUPPRIMER
+            col_m, col_d = st.columns([0.9, 0.1])
+            with col_m: st.write(f"**{c['user']}** : {c['msg']}")
+            with col_d:
                 if st.button("❌", key=f"del_{i}"):
-                    st.session_state.comments.pop(i)
-                    sauver_data(DB_FILE, st.session_state.comments)
-                    st.rerun()
-            
-            # CHAMP POUR RÉPONDRE
+                    st.session_state.comments.pop(i); sauver_data(DB_FILE, st.session_state.comments); st.rerun()
             if not c.get('reply'):
-                ans = st.text_input("Répondre au message :", key=f"ans_{i}")
-                if st.button("Valider la réponse", key=f"btn_{i}"):
+                ans = st.text_input("Réponse :", key=f"ans_{i}")
+                if st.button("Répondre", key=f"btn_{i}"):
                     st.session_state.comments[i]['reply'] = ans
-                    sauver_data(DB_FILE, st.session_state.comments)
-                    st.rerun()
-            else:
-                st.write(f"Réponse actuelle : {c['reply']}")
+                    sauver_data(DB_FILE, st.session_state.comments); st.rerun()
