@@ -57,93 +57,87 @@ st.markdown("""
 # --- PAGE DE DÉTAILS (PLEIN ÉCRAN) ---
 if st.session_state.page == "details" and st.session_state.selected_game:
     g = st.session_state.selected_game
-    
     if st.button("⬅️ RETOUR À L'ACCUEIL"):
         st.session_state.page = "home"
         st.rerun()
 
     st.markdown(f"<h1 style='text-align:center; font-size:60px;'>{g['name']}</h1>", unsafe_allow_html=True)
-    
     col_main, col_side = st.columns([2, 1])
     
     with col_main:
-        # Vidéo de la bande-annonce
         if 'videos' in g:
             vid_id = g['videos'][0]['video_id']
             st.subheader("📺 BANDE-ANNONCE OFFICIELLE")
             st.video(f"https://www.youtube.com/watch?v={vid_id}")
-            st.markdown(f"[🔗 Voir sur YouTube](https://www.youtube.com/watch?v={vid_id})", unsafe_allow_html=True)
         
-        # Screenshots / Gameplay
         if 'screenshots' in g:
             st.subheader("📸 IMAGES DU GAMEPLAY")
-            for ss in g['screenshots'][:3]: # Affiche les 3 premières images
-                img_url = "https:" + ss['url'].replace('t_thumb', 't_720p')
-                st.image(img_url, use_container_width=True)
+            for ss in g['screenshots'][:3]:
+                st.image("https:" + ss['url'].replace('t_thumb', 't_720p'), use_container_width=True)
 
     with col_side:
         st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-        st.metric(label="⭐ NOTE GLOBALE", value=f"{int(g.get('total_rating', 0))}/100")
+        st.metric(label="⭐ NOTE", value=f"{int(g.get('total_rating', 0))}/100")
         st.subheader("📝 RÉSUMÉ")
         st.write(g.get('summary', 'Aucun résumé disponible.'))
-        
     st.stop()
 
 # --- PAGE D'ACCUEIL ---
-st.markdown('<div class="news-ticker"><div class="news-text">🚀 GAMETREND 2026 -- GTA VI vs CYBERPUNK 2 : LE VOTE EST SERRÉ -- DÉCOUVREZ LE GAMEPLAY DES DERNIERS JEUX -- </div></div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker"><div class="news-text">🚀 GAMETREND 2026 -- RECHERCHEZ VOS JEUX PRÉFÉRÉS -- GTA VI vs CYBERPUNK 2 -- GAMEPLAY & TRAILERS DISPONIBLES --</div></div>', unsafe_allow_html=True)
 st.title("GameTrend Ultimate")
 
-# --- SECTION DUEL (AVEC POURCENTAGES) ---
+# --- SECTION DUEL ---
 st.header("🔥 Le Duel du Moment")
 v1, vs_txt, v2 = st.columns([2, 1, 2])
 with v1:
     if st.button("Voter GTA VI", use_container_width=True):
         st.session_state.vs['j1'] += 1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
-with vs_txt:
-    st.markdown("<h1 style='text-align:center; color:red;'>VS</h1>", unsafe_allow_html=True)
+with vs_txt: st.markdown("<h1 style='text-align:center; color:red;'>VS</h1>", unsafe_allow_html=True)
 with v2:
     if st.button("Voter CYBERPUNK 2", use_container_width=True):
         st.session_state.vs['j2'] += 1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
 
 total = st.session_state.vs['j1'] + st.session_state.vs['j2']
 p1 = (st.session_state.vs['j1'] / total * 100) if total > 0 else 50
-p2 = 100 - p1
-
 st.progress(p1 / 100)
-st.markdown(f"<div class='percentage-text'>GTA VI: {int(p1)}% | CYBERPUNK 2: {int(p2)}%</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='percentage-text'>GTA VI: {int(p1)}% | CYBERPUNK 2: {int(100-p1)}%</div>", unsafe_allow_html=True)
 
 # --- SECTION COMMUNAUTÉ ---
 st.divider()
 st.header("💬 Communauté")
 if not st.session_state.user_pseudo:
-    pseudo = st.text_input("Choisis un pseudo :")
-    if st.button("Entrer dans le salon"): st.session_state.user_pseudo = pseudo; st.rerun()
+    pseudo = st.text_input("Pseudo :")
+    if st.button("Rejoindre"): st.session_state.user_pseudo = pseudo; st.rerun()
 else:
     with st.form("chat_form", clear_on_submit=True):
-        msg = st.text_input(f"Message ({st.session_state.user_pseudo}) :")
+        msg = st.text_input(f"Message ({st.session_state.user_pseudo})")
         if st.form_submit_button("Envoyer"):
-            if msg:
-                words = msg.lower().split()
-                if any(bad in words for bad in BAD_WORDS):
-                    st.error("⚠️ Langage inapproprié !")
-                else:
-                    st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": msg, "reply": None})
-                    sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+            if msg and not any(bad in msg.lower().split() for bad in BAD_WORDS):
+                st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": msg, "reply": None})
+                sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+            elif msg: st.error("Langage inapproprié !")
 
 for c in st.session_state.comments[::-1]:
     st.markdown(f"**{c['user']}** : {c['msg']}")
-    if c.get('reply'):
-        st.markdown(f"<div class='admin-reply'><span class='badge-admin'>ADMIN</span>{c['reply']}</div>", unsafe_allow_html=True)
+    if c.get('reply'): st.markdown(f"<div class='admin-reply'><span class='badge-admin'>ADMIN</span>{c['reply']}</div>", unsafe_allow_html=True)
 
-# --- CATALOGUE ---
+# --- CATALOGUE & RECHERCHE (NOUVEAU) ---
 st.divider()
-st.header("🎮 Catalogue de Jeux")
-platforms = {"PS5": 167, "Xbox Series X": 169, "Switch": 130, "PC": 6}
-p_choice = st.selectbox("Plateforme :", list(platforms.keys()))
+st.header("🎮 Catalogue & Recherche")
 
-# Query avec screenshots et videos
-query = f"fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where platforms = ({platforms[p_choice]}) & cover != null; sort total_rating desc; limit 12;"
-jeux = fetch_data("games", query)
+col_search, col_plat = st.columns([2, 1])
+with col_search:
+    search_query = st.text_input("🔍 Rechercher un jeu précisément...", placeholder="Ex: Elden Ring, FIFA, Zelda...")
+with col_plat:
+    platforms = {"PS5": 167, "Xbox Series X": 169, "Switch": 130, "PC": 6}
+    p_choice = st.selectbox("Ou filtrer par console :", list(platforms.keys()))
+
+if search_query:
+    q = f'search "{search_query}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
+else:
+    q = f"fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where platforms = ({platforms[p_choice]}) & cover != null; sort popularity desc; limit 12;"
+
+jeux = fetch_data("games", q)
 
 if jeux:
     cols = st.columns(6)
@@ -157,16 +151,14 @@ if jeux:
 
 # --- ADMIN ---
 st.divider()
-with st.expander("🛠️ ADMIN PANEL"):
-    pwd = st.text_input("Password :", type="password", key="adm_pwd")
-    if pwd == "628316":
-        if st.button("🗑️ Reset Chat"):
-            st.session_state.comments = []; sauver_data(DB_FILE, []); st.rerun()
+with st.expander("🛠️ ADMIN"):
+    if st.text_input("Code :", type="password", key="adm_final") == "628316":
+        if st.button("🗑️ Reset Chat"): st.session_state.comments = []; sauver_data(DB_FILE, []); st.rerun()
         for i, c in enumerate(st.session_state.comments):
-            st.write(f"[{c['user']}] {c['msg']}")
+            st.write(f"**{c['user']}** : {c['msg']}")
             if st.button("❌", key=f"del_{i}"):
                 st.session_state.comments.pop(i); sauver_data(DB_FILE, st.session_state.comments); st.rerun()
             if not c.get('reply'):
                 rep = st.text_input("Réponse", key=f"rep_{i}")
-                if st.button("Envoyer", key=f"b_rep_{i}"):
+                if st.button("OK", key=f"b_{i}"):
                     st.session_state.comments[i]['reply'] = rep; sauver_data(DB_FILE, st.session_state.comments); st.rerun()
