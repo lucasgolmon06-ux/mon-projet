@@ -70,13 +70,13 @@ if st.session_state.page == "details" and st.session_state.selected_game:
             st.video(f"https://www.youtube.com/watch?v={g['videos'][0]['video_id']}")
         
         if 'screenshots' in g:
-            st.subheader("📸 GAMEPLAY")
+            st.subheader("📸 GAMEPLAY (IMAGERIE)")
             for ss in g['screenshots'][:3]:
                 st.image("https:" + ss['url'].replace('t_thumb', 't_720p'), use_container_width=True)
 
     with col_side:
         st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-        st.metric(label="⭐ NOTE", value=f"{int(g.get('total_rating', 0))}/100")
+        st.metric(label="⭐ NOTE GLOBALE", value=f"{int(g.get('total_rating', 0))}/100")
         st.subheader("📝 RÉSUMÉ")
         st.write(g.get('summary', 'Aucun résumé disponible.'))
     st.stop()
@@ -120,18 +120,18 @@ for c in st.session_state.comments[::-1]:
 
 # --- CATALOGUE & RECHERCHE (FUSIONNÉ) ---
 st.divider()
-st.header("🎮 Catalogue de Jeux")
+st.header("🎮 Recherche de Jeux")
 
-# Barre de recherche unique
-search_input = st.text_input("🔍 Rechercher un jeu (ex: GTA, Elden Ring, FIFA...)", key="search_bar")
+# BARRE DE RECHERCHE
+search_input = st.text_input("🔍 Tape le nom d'un jeu pour le trouver...", key="search_bar")
 
 if search_input:
-    # Recherche spécifique
+    # Si on cherche, on ignore la plateforme
     query = f'search "{search_input}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
 else:
-    # Top 12 par plateforme si pas de recherche
+    # Sinon on propose le top par console
     platforms = {"PS5": 167, "Xbox Series X": 169, "Switch": 130, "PC": 6}
-    p_choice = st.selectbox("Ou filtrer par console :", list(platforms.keys()))
+    p_choice = st.selectbox("Ou choisis une plateforme :", list(platforms.keys()))
     query = f"fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where platforms = ({platforms[p_choice]}) & cover != null; sort popularity desc; limit 12;"
 
 jeux = fetch_data("games", query)
