@@ -69,7 +69,7 @@ if st.session_state.page == "details" and st.session_state.selected_game:
     st.stop()
 
 # --- 5. ACCUEIL ---
-st.markdown('<div class="news-ticker"><div class="news-text">🚀 BIENVENUE EN 2026 : DÉCOUVREZ LES MEILLEURS AAA, INDÉS ET RÉTRO -- RECHERCHE DISPONIBLE -- </div></div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker"><div class="news-text">🚀 BIENVENUE EN 2026 -- DÉCOUVREZ LES AAA, LES INDÉS ET LES CLASSIQUES RÉTRO -- </div></div>', unsafe_allow_html=True)
 
 # DUEL
 st.header("🔥 Duel du moment")
@@ -85,42 +85,39 @@ p = (st.session_state.vs['j1']/t*100) if t>0 else 50
 st.progress(p/100)
 st.write(f"GTA VI: {int(p)}% | CP2: {int(100-p)}%")
 
-# --- 6. CATALOGUE MULTI-CATÉGORIES ---
+# --- 6. CATALOGUE MULTI-ONGLETS ---
 st.divider()
-st.header("🔍 Exploration des Jeux")
+st.header("🎮 Exploration des Jeux")
 
-# BARRE DE RECHERCHE PRIORITAIRE
-search = st.text_input("Rechercher un jeu précis (ex: Elden Ring, Zelda...)", placeholder="Tapez ici...")
+search = st.text_input("🔍 Recherche rapide (annule les onglets) :", placeholder="Nom du jeu...")
+
+def afficher_grille(query):
+    jeux = fetch_data("games", query)
+    if jeux:
+        cols = st.columns(6)
+        for idx, j in enumerate(jeux):
+            with cols[idx%6]:
+                if 'cover' in j:
+                    st.image("https:" + j['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+                    if st.button("Détails", key=f"d_{j['id']}"):
+                        st.session_state.selected_game = j; st.session_state.page = "details"; st.rerun()
 
 if search:
     q = f'search "{search}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
-    jeux = fetch_data("games", q)
+    afficher_grille(q)
 else:
-    # SYSTÈME D'ONGLETS POUR LES CATÉGORIES
     tab1, tab2, tab3, tab4 = st.tabs(["🏆 Meilleurs AAA", "✨ Pépites Indés", "🆕 Attendus 2026", "🕹️ Légendes Rétro"])
     
-    with tab1: # AAA : Gros budget, bien notés
-        q = "fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where total_rating > 85 & category = 0; sort total_rating desc; limit 12;"
-    with tab2: # INDÉ : Genre 32
-        q = "fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where genres = (32) & total_rating > 75; sort popularity desc; limit 12;"
-    with tab3: # ATTENDUS 2026 : Sortie en 2026
-        q = "fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where first_release_date >= 1767225600; sort popularity desc; limit 12;"
-    with tab4: # RÉTRO : Sortie avant 2000
-        q = "fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where first_release_date < 946684800 & total_rating > 80; sort popularity desc; limit 12;"
-    
-    jeux = fetch_data("games", q)
+    with tab1:
+        afficher_grille("fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where total_rating > 85 & category = 0; sort popularity desc; limit 12;")
+    with tab2:
+        afficher_grille("fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where genres = (32) & total_rating > 70; sort popularity desc; limit 12;")
+    with tab3:
+        afficher_grille("fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where first_release_date >= 1735689600; sort popularity desc; limit 12;")
+    with tab4:
+        afficher_grille("fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where first_release_date < 946684800 & total_rating > 80; sort popularity desc; limit 12;")
 
-# AFFICHAGE DES JEUX
-if jeux:
-    cols = st.columns(6)
-    for idx, j in enumerate(jeux):
-        with cols[idx%6]:
-            if 'cover' in j:
-                st.image("https:" + j['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                if st.button("🔎 Détails", key=f"d_{j['id']}"):
-                    st.session_state.selected_game = j; st.session_state.page = "details"; st.rerun()
-
-# --- 7. FORUM ---
+# --- 7. FORUM & ADMIN ---
 st.divider()
 st.header("💬 Forum")
 if not st.session_state.user_pseudo:
@@ -137,9 +134,7 @@ for c in st.session_state.comments[::-1]:
     st.write(f"**{c['user']}** : {c['msg']}")
     if c.get('reply'): st.markdown(f"<div class='admin-reply'>**ADMIN** : {c['reply']}</div>", unsafe_allow_html=True)
 
-# --- 8. ADMIN ---
-st.divider()
-with st.expander("Admin"):
+with st.expander("🛠️ Admin"):
     if st.text_input("Code", type="password") == "628316":
         for i, c in enumerate(st.session_state.comments):
             st.write(f"{c['user']}: {c['msg']}")
