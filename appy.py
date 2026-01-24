@@ -35,100 +35,111 @@ def fetch_data(endpoint, query):
 if 'comments' not in st.session_state: st.session_state.comments = charger_data(DB_FILE)
 if 'vs' not in st.session_state: st.session_state.vs = charger_data(VERSUS_FILE, {"j1": 0, "j2": 0})
 if 'user_pseudo' not in st.session_state: st.session_state.user_pseudo = None
+if 'selected_game' not in st.session_state: st.session_state.selected_game = None
 
-# --- 3. STYLE CSS ---
-st.set_page_config(page_title="GameTrend 2026", layout="wide")
+# --- 3. STYLE CSS (GRANDE TAILLE) ---
+st.set_page_config(page_title="GameTrend Ultimate", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
-    .news-ticker { background: #0072ce; color: white; padding: 10px; font-weight: bold; overflow: hidden; white-space: nowrap; border-radius: 5px; }
+    h1 { font-size: 60px !important; text-align: center; font-weight: 900; }
+    .news-ticker { background: #0072ce; color: white; padding: 12px; font-weight: bold; overflow: hidden; white-space: nowrap; border-radius: 5px; margin-bottom: 20px;}
     .news-text { display: inline-block; padding-left: 100%; animation: ticker 25s linear infinite; }
     @keyframes ticker { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
-    .admin-reply { background: #1a1a00; border-left: 5px solid #ffcc00; padding: 10px; margin-left: 30px; border-radius: 8px; margin-top: 5px; }
-    .badge-admin { background: linear-gradient(45deg, #ffd700, #ff8c00); color: black; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
+    .msg-user { background: #001a3d; padding: 12px; border-radius: 10px; border-left: 5px solid #0072ce; margin-top: 10px; }
+    .admin-reply { background: #1a1a00; border-left: 5px solid #ffcc00; padding: 10px; margin-left: 30px; border-radius: 8px; }
     </style>
 """, unsafe_allow_html=True)
 
 # --- 4. BANDEAU & TITRE ---
-st.markdown('<div class="news-ticker"><div class="news-text">🚀 BIENVENUE SUR GAMETREND 2026 -- TOUTES LES NEWS JEUX VIDÉO EN TEMPS RÉEL -- GTA VI ARRIVE -- </div></div>', unsafe_allow_html=True)
-st.title("GameTrend Ultimate")
+st.markdown('<div class="news-ticker"><div class="news-text">🚀 GAMETREND 2026 : RECHERCHEZ VOS JEUX, REGARDEZ LES TRAILERS ET VOTEZ AU DUEL -- GTA VI vs CYBERPUNK 2 -- </div></div>', unsafe_allow_html=True)
+st.markdown("<h1>GAMETREND ULTIMATE</h1>", unsafe_allow_html=True)
 
 # --- 5. SECTION DUEL ---
-st.header("🔥 Le Duel de la Semaine")
+st.header("🔥 Le Duel du Moment")
 v1, vs_txt, v2 = st.columns([2, 1, 2])
 with v1:
     st.subheader("GTA VI")
-    if st.button("Voter GTA VI"):
+    if st.button("Voter GTA VI", use_container_width=True):
         st.session_state.vs['j1'] += 1
-        sauver_data(VERSUS_FILE, st.session_state.vs)
-        st.rerun()
-with vs_txt:
-    st.markdown("<h1 style='text-align:center;'>VS</h1>", unsafe_allow_html=True)
+        sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
+with vs_txt: st.markdown("<h1 style='text-align:center;'>VS</h1>", unsafe_allow_html=True)
 with v2:
     st.subheader("CYBERPUNK 2")
-    if st.button("Voter CYBERPUNK 2"):
+    if st.button("Voter CYBERPUNK 2", use_container_width=True):
         st.session_state.vs['j2'] += 1
-        sauver_data(VERSUS_FILE, st.session_state.vs)
+        sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
+
+p1 = (st.session_state.vs['j1'] / (st.session_state.vs['j1'] + st.session_state.vs['j2'] or 1)) * 100
+st.progress(p1 / 100)
+
+# --- 6. RECHERCHE ET CATALOGUE ---
+st.divider()
+st.header("🎮 Rechercher un Jeu")
+search_query = st.text_input("Tapez le nom d'un jeu (ex: Elden Ring, Zelda...)", placeholder="Rechercher...")
+
+if search_query:
+    q = f'search "{search_query}"; fields name, cover.url, summary, videos.video_id, total_rating; limit 8; where cover != null;'
+else:
+    q = 'fields name, cover.url, summary, videos.video_id, total_rating; sort popularity desc; limit 8; where cover != null;'
+
+jeux = fetch_data("games", q)
+
+if jeux:
+    cols = st.columns(4)
+    for i, j in enumerate(jeux):
+        with cols[i % 4]:
+            st.image("https:" + j['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+            if st.button(f"Infos : {j['name']}", key=f"btn_{j['id']}"):
+                st.session_state.selected_game = j
+                st.rerun()
+
+# AFFICHAGE DES INFOS DU JEU SÉLECTIONNÉ
+if st.session_state.selected_game:
+    g = st.session_state.selected_game
+    st.markdown(f"## ℹ️ {g['name']}")
+    col_img, col_txt = st.columns([1, 2])
+    with col_img:
+        st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+    with col_txt:
+        st.write(f"**Note :** {int(g.get('total_rating', 0))}/100")
+        st.write(f"**Résumé :** {g.get('summary', 'Pas de résumé disponible.')}")
+        
+        if 'videos' in g:
+            st.write("**Bande-annonce :**")
+            vid_id = g['videos'][0]['video_id']
+            st.video(f"https://www.youtube.com/watch?v={vid_id}")
+    
+    if st.button("Fermer les détails"):
+        st.session_state.selected_game = None
         st.rerun()
 
-total = st.session_state.vs['j1'] + st.session_state.vs['j2']
-p1 = (st.session_state.vs['j1'] / total * 100) if total > 0 else 50
-st.progress(p1 / 100)
-st.write(f"📊 Score : {int(p1)}% vs {int(100-p1)}%")
-
-# --- 6. SECTION COMMUNAUTÉ ---
+# --- 7. SECTION COMMUNAUTÉ ---
 st.divider()
 st.header("💬 Communauté")
 if not st.session_state.user_pseudo:
-    pseudo = st.text_input("Ton pseudo :")
-    if st.button("Rejoindre le chat"):
-        st.session_state.user_pseudo = pseudo
-        st.rerun()
+    pseudo = st.text_input("Pseudo :")
+    if st.button("Se connecter"): st.session_state.user_pseudo = pseudo; st.rerun()
 else:
     with st.form("chat_form", clear_on_submit=True):
-        message = st.text_input(f"Message ({st.session_state.user_pseudo}) :")
+        message = st.text_input(f"Message ({st.session_state.user_pseudo})")
         if st.form_submit_button("Envoyer"):
             st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": message, "reply": None})
-            sauver_data(DB_FILE, st.session_state.comments)
-            st.rerun()
+            sauver_data(DB_FILE, st.session_state.comments); st.rerun()
 
 for c in st.session_state.comments[::-1]:
-    st.markdown(f"**{c['user']}** : {c['msg']}")
+    st.markdown(f"<div class='msg-user'><b>{c['user']}</b> : {c['msg']}</div>", unsafe_allow_html=True)
     if c.get('reply'):
-        st.markdown(f"<div class='admin-reply'><span class='badge-admin'>ADMIN</span> {c['reply']}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='admin-reply'>🛡️ {c['reply']}</div>", unsafe_allow_html=True)
 
-# --- 7. SECTION CATALOGUES ---
+# --- 8. ZONE ADMIN ---
 st.divider()
-st.header("🎮 Catalogues Jeux")
-platforms = {"PS5": 167, "Xbox Series X": 169, "Switch": 130, "PC": 6}
-p_choice = st.selectbox("Console :", list(platforms.keys()))
-
-query = f"fields name, cover.url; where platforms = ({platforms[p_choice]}) & cover != null; sort total_rating desc; limit 12;"
-jeux = fetch_data("games", query)
-
-if jeux:
-    cols = st.columns(6)
-    for i, j in enumerate(jeux):
-        with cols[i % 6]:
-            st.image("https:" + j['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-            st.write(j['name'])
-
-# --- 8. ZONE ADMIN TOUT EN BAS ---
-st.divider()
-with st.expander("🛠️ Accès Administration"):
-    master_code = st.text_input("Code secret :", type="password", key="master_pwd")
-    
-    if master_code == "628316":
-        st.success("Mode Admin activé 🛡️")
-        st.subheader("Répondre aux messages :")
-        
+with st.expander("🛠️ Admin"):
+    if st.text_input("Code :", type="password") == "628316":
         for i, c in enumerate(st.session_state.comments):
             if not c.get('reply'):
-                st.info(f"**{c['user']}** : {c['msg']}")
-                rep_admin = st.text_input("Ta réponse :", key=f"admin_rep_{i}")
-                if st.button("Poster la réponse", key=f"admin_btn_{i}"):
-                    st.session_state.comments[i]['reply'] = rep_admin
-                    sauver_data(DB_FILE, st.session_state.comments)
-                    st.rerun()
-    elif master_code != "":
-        st.error("Code incorrect")
+                with st.expander(f"Répondre à {c['user']}"):
+                    ans = st.text_input("Réponse :", key=f"ans_{i}")
+                    if st.button("Poster", key=f"btn_ans_{i}"):
+                        st.session_state.comments[i]['reply'] = ans
+                        sauver_data(DB_FILE, st.session_state.comments); st.rerun()
