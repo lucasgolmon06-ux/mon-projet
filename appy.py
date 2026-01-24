@@ -9,7 +9,7 @@ CLIENT_SECRET = 'n0i3u05gs9gmknoho2sed9q3vfn1y3'
 DB_FILE = "data_comms.json"
 VERSUS_FILE = "versus_stats.json"
 
-# Liste noire de mots (à compléter si besoin)
+# Liste noire de mots
 BAD_WORDS = ["merde", "connard", "fdp", "salope", "pute", "encule", "con"]
 
 def charger_data(file, default=[]):
@@ -61,20 +61,18 @@ st.title("GameTrend Ultimate")
 st.header("🔥 Le Duel de la Semaine")
 v1, vs_txt, v2 = st.columns([2, 1, 2])
 with v1:
-    st.subheader("GTA VI")
-    if st.button("Voter GTA VI"):
+    if st.button("Voter GTA VI", use_container_width=True):
         st.session_state.vs['j1'] += 1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
 with vs_txt: st.markdown("<h1 style='text-align:center;'>VS</h1>", unsafe_allow_html=True)
 with v2:
-    st.subheader("CYBERPUNK 2")
-    if st.button("Voter CYBERPUNK 2"):
+    if st.button("Voter CYBERPUNK 2", use_container_width=True):
         st.session_state.vs['j2'] += 1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
 
 total = st.session_state.vs['j1'] + st.session_state.vs['j2']
 p1 = (st.session_state.vs['j1'] / total * 100) if total > 0 else 50
 st.progress(p1 / 100)
 
-# --- 6. SECTION COMMUNAUTÉ (FILTRE CORRIGÉ) ---
+# --- 6. SECTION COMMUNAUTÉ ---
 st.divider()
 st.header("💬 Communauté")
 if not st.session_state.user_pseudo:
@@ -85,16 +83,12 @@ else:
         message = st.text_input(f"Message ({st.session_state.user_pseudo}) :")
         if st.form_submit_button("Envoyer"):
             if message:
-                # Vérification intelligente : on regarde chaque mot
                 words_in_msg = message.lower().split()
-                has_insult = any(bad in words_in_msg for bad in BAD_WORDS)
-                
-                if has_insult:
-                    st.error("⚠️ Ton message contient un mot interdit.")
+                if any(bad in words_in_msg for bad in BAD_WORDS):
+                    st.error("⚠️ Mot interdit détecté.")
                 else:
                     st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": message, "reply": None})
-                    sauver_data(DB_FILE, st.session_state.comments)
-                    st.rerun()
+                    sauver_data(DB_FILE, st.session_state.comments); st.rerun()
 
 for c in st.session_state.comments[::-1]:
     st.markdown(f"**{c['user']}** : {c['msg']}")
@@ -115,7 +109,7 @@ if jeux:
     for i, j in enumerate(jeux):
         with cols[i % 6]:
             st.image("https:" + j['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-            if st.button(f"Voir : {j['name'][:15]}", key=f"btn_{j['id']}"):
+            if st.button(f"Infos", key=f"btn_{j['id']}"):
                 st.session_state.selected_game = j; st.rerun()
 
 if st.session_state.selected_game:
@@ -126,22 +120,35 @@ if st.session_state.selected_game:
     with c2:
         st.write(f"**Note :** {int(g.get('total_rating', 0))}/100")
         st.write(f"**Résumé :** {g.get('summary', 'Pas de résumé.')}")
-        if 'videos' in g:
-            st.video(f"https://www.youtube.com/watch?v={g['videos'][0]['video_id']}")
+        if 'videos' in g: st.video(f"https://www.youtube.com/watch?v={g['videos'][0]['video_id']}")
     if st.button("Fermer"): st.session_state.selected_game = None; st.rerun()
 
-# --- 8. ADMIN ---
+# --- 8. ADMIN (CORRIGÉ ET STABLE) ---
 st.divider()
-with st.expander("🛠️ Admin"):
-    if st.text_input("Code :", type="password") == "628316":
+with st.expander("🛠️ ACCÈS ADMIN"):
+    code_entree = st.text_input("Code Secret :", type="password", key="main_admin_code")
+    
+    if code_entree == "628316":
+        st.success("Mode Admin Activé")
+        
+        if st.button("🗑️ TOUT EFFACER (CHAT)", color="red"):
+            st.session_state.comments = []
+            sauver_data(DB_FILE, [])
+            st.rerun()
+            
+        st.write("---")
         for i, c in enumerate(st.session_state.comments):
             col_m, col_d = st.columns([0.8, 0.2])
             with col_m: st.write(f"**{c['user']}** : {c['msg']}")
             with col_d:
                 if st.button("❌", key=f"del_{i}"):
-                    st.session_state.comments.pop(i); sauver_data(DB_FILE, st.session_state.comments); st.rerun()
-            if not c.get('reply'):
-                ans = st.text_input("Réponse :", key=f"ans_{i}")
-                if st.button("Répondre", key=f"btn_{i}"):
-                    st.session_state.comments[i]['reply'] = ans
+                    st.session_state.comments.pop(i)
                     sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+            
+            # Champ de réponse
+            if not c.get('reply'):
+                with st.container():
+                    rep = st.text_input(f"Répondre à {c['user']}", key=f"rep_field_{i}")
+                    if st.button("Envoyer Réponse", key=f"rep_btn_{i}"):
+                        st.session_state.comments[i]['reply'] = rep
+                        sauver_data(DB_FILE, st.session_state.comments); st.rerun()
