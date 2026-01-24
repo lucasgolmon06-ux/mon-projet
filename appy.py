@@ -9,7 +9,7 @@ CLIENT_SECRET = 'n0i3u05gs9gmknoho2sed9q3vfn1y3'
 DB_FILE = "data_comms.json"
 VERSUS_FILE = "versus_stats.json"
 
-# Liste noire simple (tu peux en rajouter)
+# Liste noire de mots (à compléter si besoin)
 BAD_WORDS = ["merde", "connard", "fdp", "salope", "pute", "encule", "con"]
 
 def charger_data(file, default=[]):
@@ -54,7 +54,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 4. BANDEAU ---
-st.markdown('<div class="news-ticker"><div class="news-text">🚀 GAMETREND 2026 -- CLIQUEZ SUR UN JEU POUR VOIR LE TRAILER -- CHAT MODÉRÉ AUTOMATIQUEMENT -- GTA VI vs CYBERPUNK 2 -- </div></div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker"><div class="news-text">🚀 GAMETREND 2026 -- CLIQUEZ SUR UN JEU POUR VOIR LE TRAILER -- CHAT MODÉRÉ -- GTA VI vs CYBERPUNK 2 -- </div></div>', unsafe_allow_html=True)
 st.title("GameTrend Ultimate")
 
 # --- 5. SECTION DUEL ---
@@ -74,7 +74,7 @@ total = st.session_state.vs['j1'] + st.session_state.vs['j2']
 p1 = (st.session_state.vs['j1'] / total * 100) if total > 0 else 50
 st.progress(p1 / 100)
 
-# --- 6. SECTION COMMUNAUTÉ (AVEC ANTI-INSULTE) ---
+# --- 6. SECTION COMMUNAUTÉ (FILTRE CORRIGÉ) ---
 st.divider()
 st.header("💬 Communauté")
 if not st.session_state.user_pseudo:
@@ -84,19 +84,24 @@ else:
     with st.form("chat_form", clear_on_submit=True):
         message = st.text_input(f"Message ({st.session_state.user_pseudo}) :")
         if st.form_submit_button("Envoyer"):
-            # Vérification des insultes
-            if any(word in message.lower() for word in BAD_WORDS):
-                st.error("⚠️ Message bloqué : langage inapproprié.")
-            elif message:
-                st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": message, "reply": None})
-                sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+            if message:
+                # Vérification intelligente : on regarde chaque mot
+                words_in_msg = message.lower().split()
+                has_insult = any(bad in words_in_msg for bad in BAD_WORDS)
+                
+                if has_insult:
+                    st.error("⚠️ Ton message contient un mot interdit.")
+                else:
+                    st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": message, "reply": None})
+                    sauver_data(DB_FILE, st.session_state.comments)
+                    st.rerun()
 
 for c in st.session_state.comments[::-1]:
     st.markdown(f"**{c['user']}** : {c['msg']}")
     if c.get('reply'):
         st.markdown(f"<div class='admin-reply'><span class='badge-admin'>ADMIN</span>{c['reply']}</div>", unsafe_allow_html=True)
 
-# --- 7. CATALOGUES AVEC INFOS + TRAILERS ---
+# --- 7. CATALOGUES ---
 st.divider()
 st.header("🎮 Catalogues Jeux")
 platforms = {"PS5": 167, "Xbox Series X": 169, "Switch": 130, "PC": 6}
@@ -113,27 +118,24 @@ if jeux:
             if st.button(f"Voir : {j['name'][:15]}", key=f"btn_{j['id']}"):
                 st.session_state.selected_game = j; st.rerun()
 
-# Affichage des détails du jeu sélectionné
 if st.session_state.selected_game:
     g = st.session_state.selected_game
-    with st.container():
-        st.markdown(f"### ℹ️ {g['name']}")
-        c1, c2 = st.columns([1, 2])
-        with c1: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-        with c2:
-            st.write(f"**Note :** {int(g.get('total_rating', 0))}/100")
-            st.write(f"**Résumé :** {g.get('summary', 'Pas de résumé.')}")
-            if 'videos' in g:
-                st.write("**Bande-annonce :**")
-                st.video(f"https://www.youtube.com/watch?v={g['videos'][0]['video_id']}")
-        if st.button("Fermer les détails"): st.session_state.selected_game = None; st.rerun()
+    st.markdown(f"### ℹ️ {g['name']}")
+    c1, c2 = st.columns([1, 2])
+    with c1: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+    with c2:
+        st.write(f"**Note :** {int(g.get('total_rating', 0))}/100")
+        st.write(f"**Résumé :** {g.get('summary', 'Pas de résumé.')}")
+        if 'videos' in g:
+            st.video(f"https://www.youtube.com/watch?v={g['videos'][0]['video_id']}")
+    if st.button("Fermer"): st.session_state.selected_game = None; st.rerun()
 
-# --- 8. ADMIN (SUPPRESSION + RÉPONSE) ---
+# --- 8. ADMIN ---
 st.divider()
 with st.expander("🛠️ Admin"):
     if st.text_input("Code :", type="password") == "628316":
         for i, c in enumerate(st.session_state.comments):
-            col_m, col_d = st.columns([0.9, 0.1])
+            col_m, col_d = st.columns([0.8, 0.2])
             with col_m: st.write(f"**{c['user']}** : {c['msg']}")
             with col_d:
                 if st.button("❌", key=f"del_{i}"):
