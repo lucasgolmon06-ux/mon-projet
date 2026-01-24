@@ -71,13 +71,14 @@ if st.session_state.page == "details" and st.session_state.selected_game:
             st.image("https:" + g['screenshots'][0]['url'].replace('t_thumb', 't_720p'), use_container_width=True)
     
     with c_desc:
-        st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+        if 'cover' in g:
+            st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
         st.metric("NOTE COMMUNAUTÉ", f"{int(g.get('total_rating', 0))}/100")
         
         st.markdown("### 💰 Prix Estimés")
         st.markdown(f"""
             <div class="price-card">
-                <div class="price-line"><span>PS5 / Xbox Series</span><b>79.99€</b></div>
+                <div class="price-line"><span>Consoles Next-Gen</span><b>79.99€</b></div>
                 <div class="price-line"><span>PC Digital</span><b>69.99€</b></div>
                 <div class="price-line"><span>Nintendo Switch</span><b>59.99€</b></div>
             </div>
@@ -87,7 +88,7 @@ if st.session_state.page == "details" and st.session_state.selected_game:
     st.stop()
 
 # --- 5. ACCUEIL ---
-st.markdown('<div class="news-ticker"><div class="news-text">🚀 GAMETREND 2026 -- LES MEILLEURS JEUX DU MOMENT (NOTES > 80) -- RECHERCHEZ VOS GENRES -- GTA VI vs CYBERPUNK 2 -- </div></div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker"><div class="news-text">🚀 GAMETREND 2026 -- LES MEILLEURS JEUX (POST-2010) -- RECHERCHEZ VOS GENRES PRÉFÉRÉS -- GTA VI vs CYBERPUNK 2 -- </div></div>', unsafe_allow_html=True)
 
 # DUEL
 st.header("🔥 Duel de Légendes")
@@ -103,9 +104,9 @@ votes_t = st.session_state.vs['j1'] + st.session_state.vs['j2']
 perc = (st.session_state.vs['j1'] / votes_t * 100) if votes_t > 0 else 50
 st.progress(perc/100)
 
-# --- 6. CATALOGUE AMÉLIORÉ (SÉLECTION DES MEILLEURS) ---
+# --- 6. CATALOGUE SANS RÉTRO (POST-2010) ---
 st.divider()
-st.header("🏆 Les Meilleurs Jeux par Genre")
+st.header("🏆 Top Hits (Depuis 2010)")
 
 GENRES_MAP = {
     "Action": 31, "Aventure": 2, "RPG": 12, "Simulation": 13, 
@@ -116,17 +117,17 @@ GENRES_MAP = {
 col_s1, col_s2 = st.columns([2, 2])
 
 with col_s1:
-    search_query = st.text_input("Rechercher un titre :", placeholder="Ex: Elden Ring...")
+    search_query = st.text_input("Rechercher un titre :", placeholder="Ex: GTA, FIFA, CoD...")
 
 with col_s2:
     selected_genres = st.multiselect("Filtrer par genres :", list(GENRES_MAP.keys()))
 
-# Construction de la requête pour ne prendre que les jeux avec note > 80
+# Timestamp pour le 1er Janvier 2010 (1262304000)
 if search_query:
     query = f'search "{search_query}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
 else:
-    # On impose le filtre total_rating >= 80 pour n'avoir que "les meilleurs"
-    filters = ["cover != null", "total_rating >= 80"]
+    # Filtres : Couverture présente + Note > 80 + Sorti après 2010
+    filters = ["cover != null", "total_rating >= 80", "first_release_date > 1262304000"]
     if selected_genres:
         genre_ids = [str(GENRES_MAP[g]) for g in selected_genres]
         filters.append(f"genres = ({','.join(genre_ids)})")
@@ -145,7 +146,7 @@ if games:
                 if st.button("Détails", key=f"btn_{g['id']}"):
                     st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
 else:
-    st.warning("Aucun 'hit' (note > 80) trouvé avec ces genres.")
+    st.warning("Aucun hit trouvé avec ces critères.")
 
 # --- 7. CHAT & ADMIN ---
 st.divider()
