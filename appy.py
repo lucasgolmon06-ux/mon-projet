@@ -87,7 +87,7 @@ if st.session_state.page == "details" and st.session_state.selected_game:
     st.stop()
 
 # --- 5. ACCUEIL ---
-st.markdown('<div class="news-ticker"><div class="news-text">🚀 BIENVENUE SUR GAMETREND 2026 -- LES MEILLEURS JEUX DU MOMENT -- RECHERCHEZ VOS GENRES PRÉFÉRÉS -- GTA VI vs CYBERPUNK 2 -- </div></div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker"><div class="news-text">🚀 GAMETREND 2026 -- LES MEILLEURS JEUX DU MOMENT (NOTES > 80) -- RECHERCHEZ VOS GENRES -- GTA VI vs CYBERPUNK 2 -- </div></div>', unsafe_allow_html=True)
 
 # DUEL
 st.header("🔥 Duel de Légendes")
@@ -103,18 +103,17 @@ votes_t = st.session_state.vs['j1'] + st.session_state.vs['j2']
 perc = (st.session_state.vs['j1'] / votes_t * 100) if votes_t > 0 else 50
 st.progress(perc/100)
 
-# --- 6. CATALOGUE AMÉLIORÉ ---
+# --- 6. CATALOGUE AMÉLIORÉ (SÉLECTION DES MEILLEURS) ---
 st.divider()
-st.header("🔍 Filtre Avancé")
+st.header("🏆 Les Meilleurs Jeux par Genre")
 
-# Dictionnaire des genres IGDB
 GENRES_MAP = {
     "Action": 31, "Aventure": 2, "RPG": 12, "Simulation": 13, 
     "Sport": 14, "Course": 10, "FPS/Shooter": 5, "Combat": 4, 
     "Horreur": 19, "Indépendant": 32, "Stratégie": 15, "Plateforme": 8
 }
 
-col_s1, col_s2, col_s3 = st.columns([2, 2, 1])
+col_s1, col_s2 = st.columns([2, 2])
 
 with col_s1:
     search_query = st.text_input("Rechercher un titre :", placeholder="Ex: Elden Ring...")
@@ -122,20 +121,15 @@ with col_s1:
 with col_s2:
     selected_genres = st.multiselect("Filtrer par genres :", list(GENRES_MAP.keys()))
 
-with col_s3:
-    min_score = st.slider("Note min.", 0, 90, 0)
-
-# Construction de la requête
+# Construction de la requête pour ne prendre que les jeux avec note > 80
 if search_query:
     query = f'search "{search_query}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
 else:
-    # On construit les filtres dynamiquement
-    filters = ["cover != null"]
+    # On impose le filtre total_rating >= 80 pour n'avoir que "les meilleurs"
+    filters = ["cover != null", "total_rating >= 80"]
     if selected_genres:
         genre_ids = [str(GENRES_MAP[g]) for g in selected_genres]
         filters.append(f"genres = ({','.join(genre_ids)})")
-    if min_score > 0:
-        filters.append(f"total_rating >= {min_score}")
         
     where_clause = " & ".join(filters)
     query = f"fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where {where_clause}; sort popularity desc; limit 12;"
@@ -151,7 +145,7 @@ if games:
                 if st.button("Détails", key=f"btn_{g['id']}"):
                     st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
 else:
-    st.warning("Aucun jeu trouvé avec ces filtres.")
+    st.warning("Aucun 'hit' (note > 80) trouvé avec ces genres.")
 
 # --- 7. CHAT & ADMIN ---
 st.divider()
