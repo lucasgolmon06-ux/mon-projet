@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import json
 import os
+import urllib.parse
 
 # --- 1. CONFIGURATION & DONNÉES ---
 CLIENT_ID = '21ely20t5zzbxzby557r34oi16j4hh'
@@ -40,7 +41,7 @@ if 'user_pseudo' not in st.session_state: st.session_state.user_pseudo = None
 if 'page' not in st.session_state: st.session_state.page = "home"
 if 'selected_game' not in st.session_state: st.session_state.selected_game = None
 
-# --- 3. DESIGN & AUDIO (SANS PLUIE) ---
+# --- 3. DESIGN & AUDIO ---
 st.set_page_config(page_title="GameTrend 2026", layout="wide")
 
 st.markdown("""
@@ -95,9 +96,13 @@ if st.session_state.page == "details" and st.session_state.selected_game:
         st.markdown(f'<div class="price-box">PRIX ESTIME : {prix}</div>', unsafe_allow_html=True)
         
         st.write("Statut : En stock")
-        if st.button(f"ACHETER {g['name'].upper()}", use_container_width=True):
-            st.balloons()
-            st.success("Ajouté au panier")
+        
+        # --- LOGIQUE D'ACHAT REELLE ---
+        # On encode le nom du jeu pour l'URL
+        search_query = urllib.parse.quote(g['name'])
+        amazon_url = f"https://www.amazon.fr/s?k={search_query}+jeu+video"
+        
+        st.link_button(f"ACHETER {g['name'].upper()}", amazon_url, use_container_width=True)
         
         st.divider()
         st.metric("SCORE CRITIQUE", f"{int(score)}/100")
@@ -105,7 +110,7 @@ if st.session_state.page == "details" and st.session_state.selected_game:
     st.stop()
 
 # --- 5. PAGE ACCUEIL ---
-st.markdown('<div class="news-ticker">GAMETREND 2026 -- CATALOGUE ET VENTES EN DIRECT</div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker">GAMETREND 2026 -- ACHAT DIRECT SUR AMAZON DISPONIBLE</div>', unsafe_allow_html=True)
 
 # SECTION DUEL
 st.header("Duel de Legendes")
