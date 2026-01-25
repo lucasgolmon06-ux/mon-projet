@@ -40,7 +40,7 @@ if 'user_pseudo' not in st.session_state: st.session_state.user_pseudo = None
 if 'page' not in st.session_state: st.session_state.page = "home"
 if 'selected_game' not in st.session_state: st.session_state.selected_game = None
 
-# --- 3. DESIGN & AUDIO (SCRIPTS COMBINÉS) ---
+# --- 3. DESIGN & AUDIO ---
 st.set_page_config(page_title="GameTrend 2026", layout="wide")
 
 st.markdown("""
@@ -63,7 +63,6 @@ st.markdown("""
         const audio = window.parent.document.getElementById('clickSound');
         if(audio) { audio.currentTime = 0; audio.play(); }
     };
-    // Détection des clics sur les boutons Streamlit
     window.parent.document.addEventListener('click', function(e) {
         if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
             playClick();
@@ -75,33 +74,42 @@ st.markdown("""
 # --- 4. NAVIGATION : PAGE DÉTAILS ---
 if st.session_state.page == "details" and st.session_state.selected_game:
     g = st.session_state.selected_game
-    if st.button("⬅️ RETOUR À L'ACCUEIL"):
+    if st.button("RETOUR A L'ACCUEIL"):
         st.session_state.page = "home"; st.rerun()
     
-    st.title(f"🎮 {g['name']}")
+    st.title(g['name'])
     c_vid, c_desc = st.columns([2, 1])
     
     with c_vid:
         if 'videos' in g:
-            st.subheader("📺 Trailer Officiel")
+            st.subheader("Trailer Officiel")
             st.video(f"https://www.youtube.com/watch?v={g['videos'][0]['video_id']}")
         elif 'screenshots' in g:
             st.image("https:" + g['screenshots'][0]['url'].replace('t_thumb', 't_720p'), use_container_width=True)
     
     with c_desc:
         if 'cover' in g: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+        
         score = g.get('total_rating', 0)
         prix = "79.99€" if score > 85 else "59.99€" if score > 70 else "29.99€"
-        st.markdown(f'<div class="price-box">PRIX ESTIMÉ : {prix}</div>', unsafe_allow_html=True)
+        
+        st.markdown(f'<div class="price-box">PRIX ESTIME : {prix}</div>', unsafe_allow_html=True)
+        
+        st.write("Statut : En stock")
+        if st.button(f"ACHETER {g['name'].upper()}", use_container_width=True):
+            st.balloons()
+            st.success("Ajouté au panier")
+        
+        st.divider()
         st.metric("SCORE CRITIQUE", f"{int(score)}/100")
         st.info(g.get('summary', 'Aucun résumé disponible.'))
     st.stop()
 
 # --- 5. PAGE ACCUEIL ---
-st.markdown('<div class="news-ticker">🚀 GAMETREND 2026 -- INTERFACE SONORE & TOP 3 PS5 ACTIVÉS !</div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker">GAMETREND 2026 -- CATALOGUE ET VENTES EN DIRECT</div>', unsafe_allow_html=True)
 
 # SECTION DUEL
-st.header("🔥 Duel de Légendes")
+st.header("Duel de Legendes")
 col_v1, col_v2 = st.columns(2)
 with col_v1:
     if st.button(f"Voter GTA VI ({st.session_state.vs['j1']})", key="v_gta", use_container_width=True):
@@ -111,13 +119,13 @@ with col_v2:
         st.session_state.vs['j2']+=1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
 
 total_votes = st.session_state.vs['j1'] + st.session_state.vs['j2']
-st.write(f"📊 **Nombre total de votes : {total_votes}**")
+st.write(f"Votes totaux : {total_votes}")
 perc = (st.session_state.vs['j1'] / total_votes) if total_votes > 0 else 0.5
 st.progress(perc)
 
-# SECTION TOP 3 PS5 RÉEL
+# SECTION TOP 3 PS5
 st.divider()
-st.header("🏆 Top 3 des Meilleurs Jeux PS5")
+st.header("Top 3 des Meilleurs Jeux PS5")
 top_ps5_q = "fields name, cover.url, total_rating, summary, videos.video_id, screenshots.url; where platforms = (167) & total_rating_count > 50 & cover != null; sort total_rating desc; limit 3;"
 top_games = fetch_data("games", top_ps5_q)
 
@@ -125,19 +133,19 @@ if top_games:
     cols_top = st.columns(3)
     for i, tg in enumerate(top_games):
         with cols_top[i]:
-            st.markdown(f'<div class="top-card"><h2 style="color:#ffd700;">#{i+1}</h2><h4>{tg["name"]}</h4></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="top-card"><h2>#{i+1}</h2><h4>{tg["name"]}</h4></div>', unsafe_allow_html=True)
             st.image("https:" + tg['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
             st.metric("Score", f"{int(tg.get('total_rating', 0))}/100")
             if st.button("Voir la fiche", key=f"top_btn_{tg['id']}"):
                 st.session_state.selected_game = tg; st.session_state.page = "details"; st.rerun()
 
-# SECTION CATALOGUE & RECHERCHE
+# SECTION CATALOGUE
 st.divider()
-st.header("🔍 Catalogue & Filtres")
+st.header("Catalogue et Filtres")
 f_col1, f_col2, f_col3 = st.columns([2, 1, 1])
-with f_col1: user_search = st.text_input("Rechercher un titre...")
-with f_col2: platform_choice = st.selectbox("Console :", ["Toutes", "PS5", "Xbox Series X", "Switch", "PC"])
-with f_col3: genre_choice = st.selectbox("Genre :", ["Tous", "Action", "RPG", "Sport", "Aventure", "Shooter"])
+with f_col1: user_search = st.text_input("Chercher un jeu")
+with f_col2: platform_choice = st.selectbox("Console", ["Toutes", "PS5", "Xbox Series X", "Switch", "PC"])
+with f_col3: genre_choice = st.selectbox("Genre", ["Tous", "Action", "RPG", "Sport", "Aventure", "Shooter"])
 
 plats_map = {"PS5": 167, "Xbox Series X": 169, "Switch": 130, "PC": 6}
 genres_map = {"Action": 31, "RPG": 12, "Sport": 14, "Aventure": 31, "Shooter": 5}
@@ -157,14 +165,14 @@ if games:
         with grid[idx%6]:
             if 'cover' in g:
                 st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                if st.button("Détails", key=f"cat_btn_{g['id']}"):
+                if st.button("Details", key=f"cat_btn_{g['id']}"):
                     st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
 
 # SECTION CHAT
 st.divider()
-st.header("💬 Le Chat")
+st.header("Chat")
 if not st.session_state.user_pseudo:
-    pseudo_in = st.text_input("Pseudo :")
+    pseudo_in = st.text_input("Pseudo")
     if st.button("Rejoindre"): st.session_state.user_pseudo = pseudo_in; st.rerun()
 else:
     with st.form("chat_form", clear_on_submit=True):
@@ -179,7 +187,7 @@ for c in st.session_state.comments[::-1][:10]:
     if c.get('reply'): st.markdown(f"<div class='admin-reply'><b>ADMIN :</b> {c['reply']}</div>", unsafe_allow_html=True)
 
 # SECTION ADMIN
-with st.expander("🛠️ Admin"):
+with st.expander("Admin"):
     if st.text_input("Code Secret", type="password") == "628316":
         for i, c in enumerate(list(st.session_state.comments)):
             if st.button(f"Supprimer message {i}", key=f"del_{i}"):
