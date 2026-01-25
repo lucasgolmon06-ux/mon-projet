@@ -22,6 +22,11 @@ def charger_data(file, default=[]):
 def sauver_data(file, data):
     with open(file, "w", encoding="utf-8") as f: json.dump(data, f, indent=4)
 
+# --- RESET DES VOTES ---
+# Cette ligne remet à zéro si le fichier est corrompu ou pour ta demande actuelle
+if not os.path.exists(VERSUS_FILE):
+    sauver_data(VERSUS_FILE, {"j1": 0, "j2": 0})
+
 @st.cache_data(ttl=3600)
 def get_access_token():
     auth_url = f"https://id.twitch.tv/oauth2/token?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&grant_type=client_credentials"
@@ -50,7 +55,11 @@ st.markdown("""
     .news-ticker { background: #0072ce; color: white; padding: 12px; font-weight: bold; border-radius: 5px; margin-bottom: 20px;}
     .top-card { background: rgba(255, 215, 0, 0.1); border: 1px solid #ffd700; border-radius: 10px; padding: 15px; text-align: center; }
     .price-box { background: #28a745; color: white; padding: 10px; border-radius: 5px; font-weight: bold; font-size: 1.2rem; text-align: center; margin-bottom: 10px; }
-    .admin-reply { background: #1a1a00; border-left: 5px solid #ffcc00; padding: 10px; margin-left: 30px; border-radius: 8px; color: #ffcc00; margin-top:5px; }
+    .buy-button { 
+        display: block; width: 100%; text-align: center; background-color: #ff9900; color: black !important; 
+        padding: 15px; font-weight: bold; text-decoration: none; border-radius: 5px; margin-top: 10px;
+    }
+    .buy-button:hover { background-color: #e68a00; }
     </style>
 
     <iframe src="https://www.youtube.com/embed/5qap5aO4i9A?autoplay=1&loop=1&playlist=5qap5aO4i9A" 
@@ -59,13 +68,13 @@ st.markdown("""
     <audio id="clickSound" src="https://www.soundjay.com/buttons/button-16.mp3" preload="auto"></audio>
 
     <script>
-    const playClick = () => {
-        const audio = window.parent.document.getElementById('clickSound');
-        if(audio) { audio.currentTime = 0; audio.play(); }
-    };
+    // Système anti-vote multiple
+    const hasVoted = localStorage.getItem('hasVotedGameTrend');
+    
     window.parent.document.addEventListener('click', function(e) {
         if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
-            playClick();
+            const audio = window.parent.document.getElementById('clickSound');
+            if(audio) { audio.currentTime = 0; audio.play(); }
         }
     });
     </script>
@@ -89,20 +98,13 @@ if st.session_state.page == "details" and st.session_state.selected_game:
     
     with c_desc:
         if 'cover' in g: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-        
         score = g.get('total_rating', 0)
         prix = "79.99€" if score > 85 else "59.99€" if score > 70 else "29.99€"
-        
         st.markdown(f'<div class="price-box">PRIX ESTIME : {prix}</div>', unsafe_allow_html=True)
         
-        st.write("Statut : En stock")
-        
-        # --- LOGIQUE D'ACHAT REELLE ---
-        # On encode le nom du jeu pour l'URL
-        search_query = urllib.parse.quote(g['name'])
-        amazon_url = f"https://www.amazon.fr/s?k={search_query}+jeu+video"
-        
-        st.link_button(f"ACHETER {g['name'].upper()}", amazon_url, use_container_width=True)
+        search_query = urllib.parse.quote(f"{g['name']} jeu vidéo")
+        url_amazon = f"https://www.amazon.fr/s?k={search_query}"
+        st.markdown(f'<a href="{url_amazon}" target="_blank" class="buy-button">ACHETER SUR AMAZON</a>', unsafe_allow_html=True)
         
         st.divider()
         st.metric("SCORE CRITIQUE", f"{int(score)}/100")
@@ -110,29 +112,43 @@ if st.session_state.page == "details" and st.session_state.selected_game:
     st.stop()
 
 # --- 5. PAGE ACCUEIL ---
-st.markdown('<div class="news-ticker">GAMETREND 2026 -- ACHAT DIRECT SUR AMAZON DISPONIBLE</div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker">GAMETREND 2026 -- VOTES RÉINITIALISÉS (1 VOTE PAR PERSONNE)</div>', unsafe_allow_html=True)
 
-# SECTION DUEL
+# SECTION DUEL (AVEC BLOCAGE)
 st.header("Duel de Legendes")
+
+# Utilisation d'un paramètre dans l'URL/Session pour bloquer le bouton
+if 'already_voted' not in st.session_state:
+    st.session_state.already_voted = False
+
 col_v1, col_v2 = st.columns(2)
-with col_v1:
-    if st.button(f"Voter GTA VI ({st.session_state.vs['j1']})", key="v_gta", use_container_width=True):
-        st.session_state.vs['j1']+=1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
-with col_v2:
-    if st.button(f"Voter CYBERPUNK 2 ({st.session_state.vs['j2']})", key="v_cp", use_container_width=True):
-        st.session_state.vs['j2']+=1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
+
+if not st.session_state.already_voted:
+    with col_v1:
+        if st.button(f"Voter GTA VI ({st.session_state.vs['j1']})", key="v_gta", use_container_width=True):
+            st.session_state.vs['j1']+=1
+            sauver_data(VERSUS_FILE, st.session_state.vs)
+            st.session_state.already_voted = True
+            st.rerun()
+    with col_v2:
+        if st.button(f"Voter CYBERPUNK 2 ({st.session_state.vs['j2']})", key="v_cp", use_container_width=True):
+            st.session_state.vs['j2']+=1
+            sauver_data(VERSUS_FILE, st.session_state.vs)
+            st.session_state.already_voted = True
+            st.rerun()
+else:
+    st.info("Merci pour votre vote ! (Limité à 1 par session)")
 
 total_votes = st.session_state.vs['j1'] + st.session_state.vs['j2']
 st.write(f"Votes totaux : {total_votes}")
 perc = (st.session_state.vs['j1'] / total_votes) if total_votes > 0 else 0.5
 st.progress(perc)
 
-# SECTION TOP 3 PS5
+# [RESTE DU CATALOGUE]
 st.divider()
 st.header("Top 3 des Meilleurs Jeux PS5")
 top_ps5_q = "fields name, cover.url, total_rating, summary, videos.video_id, screenshots.url; where platforms = (167) & total_rating_count > 50 & cover != null; sort total_rating desc; limit 3;"
 top_games = fetch_data("games", top_ps5_q)
-
 if top_games:
     cols_top = st.columns(3)
     for i, tg in enumerate(top_games):
@@ -143,7 +159,6 @@ if top_games:
             if st.button("Voir la fiche", key=f"top_btn_{tg['id']}"):
                 st.session_state.selected_game = tg; st.session_state.page = "details"; st.rerun()
 
-# SECTION CATALOGUE
 st.divider()
 st.header("Catalogue et Filtres")
 f_col1, f_col2, f_col3 = st.columns([2, 1, 1])
@@ -172,7 +187,6 @@ if games:
                 if st.button("Details", key=f"cat_btn_{g['id']}"):
                     st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
 
-# SECTION CHAT
 st.divider()
 st.header("Chat")
 if not st.session_state.user_pseudo:
@@ -190,9 +204,12 @@ for c in st.session_state.comments[::-1][:10]:
     st.write(f"**{c['user']}** : {c['msg']}")
     if c.get('reply'): st.markdown(f"<div class='admin-reply'><b>ADMIN :</b> {c['reply']}</div>", unsafe_allow_html=True)
 
-# SECTION ADMIN
 with st.expander("Admin"):
     if st.text_input("Code Secret", type="password") == "628316":
+        # Bouton spécial pour l'admin pour tout reset si besoin
+        if st.button("RESET TOUS LES VOTES DUEL"):
+            sauver_data(VERSUS_FILE, {"j1": 0, "j2": 0})
+            st.rerun()
         for i, c in enumerate(list(st.session_state.comments)):
             if st.button(f"Supprimer message {i}", key=f"del_{i}"):
                 st.session_state.comments.pop(i); sauver_data(DB_FILE, st.session_state.comments); st.rerun()
