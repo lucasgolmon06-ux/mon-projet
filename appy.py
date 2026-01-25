@@ -45,9 +45,7 @@ st.set_page_config(page_title="GameTrend 2026", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
-    .news-ticker { background: #0072ce; color: white; padding: 12px; font-weight: bold; overflow: hidden; white-space: nowrap; border-radius: 5px; margin-bottom: 20px;}
-    .news-text { display: inline-block; padding-left: 100%; animation: ticker 25s linear infinite; }
-    @keyframes ticker { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
+    .news-ticker { background: #0072ce; color: white; padding: 12px; font-weight: bold; border-radius: 5px; margin-bottom: 20px;}
     .admin-reply { background: #1a1a00; border-left: 5px solid #ffcc00; padding: 10px; margin-left: 30px; border-radius: 8px; color: #ffcc00; margin-top:5px; }
     .badge-admin { background: linear-gradient(45deg, #ffd700, #ff8c00); color: black; padding: 2px 8px; border-radius: 4px; font-weight: bold; margin-right: 10px; }
     </style>
@@ -72,13 +70,13 @@ if st.session_state.page == "details" and st.session_state.selected_game:
                 st.image("https:" + ss['url'].replace('t_thumb', 't_720p'), use_container_width=True)
     
     with c_desc:
-        st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+        if 'cover' in g: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
         st.metric("SCORE IGDB", f"{int(g.get('total_rating', 0))}/100")
         st.info(g.get('summary', 'Aucun résumé.'))
     st.stop()
 
 # --- 5. PAGE ACCUEIL ---
-st.markdown('<div class="news-ticker"><div class="news-text">🚀 GAMETREND 2026 -- RECHERCHEZ VOS JEUX -- GTA VI vs CYBERPUNK 2 -- VOTEZ MAINTENANT ! --</div></div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker">🚀 GAMETREND 2026 -- RECHERCHEZ VOS JEUX -- GTA VI vs CYBERPUNK 2 -- VOTEZ MAINTENANT !</div>', unsafe_allow_html=True)
 
 # SECTION DUEL
 st.header("🔥 Le Choc des Titans")
@@ -117,15 +115,11 @@ for c in st.session_state.comments[::-1]:
 # --- 6. CATALOGUE & BARRE DE RECHERCHE ---
 st.divider()
 st.header("🔍 Catalogue & Recherche")
-
-# LA BARRE DE RECHERCHE
 user_search = st.text_input("Tape ici pour chercher un jeu précisément :", placeholder="Ex: FIFA 26, Elden Ring, Mario...")
 
 if user_search:
-    # Recherche IGDB
     q = f'search "{user_search}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
 else:
-    # Filtre Console classique
     plats = {"PS5": 167, "Xbox Series X": 169, "Switch": 130, "PC": 6}
     choice = st.selectbox("Ou choisis une console :", list(plats.keys()))
     q = f"fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where platforms = ({plats[choice]}) & cover != null; sort popularity desc; limit 12;"
@@ -135,18 +129,30 @@ if games:
     cols = st.columns(6)
     for idx, g in enumerate(games):
         with cols[idx%6]:
-            st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+            if 'cover' in g: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
             if st.button("Détails", key=f"btn_{g['id']}"):
                 st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
 
-# --- 7. ADMIN ---
+# --- 7. ADMIN (FIXED) ---
 st.divider()
 with st.expander("🛠️ Administration"):
-    if st.text_input("Mot de passe admin", type="password") == "628316":
-        for i, c in enumerate(st.session_state.comments):
-            st.write(f"{c['user']}: {c['msg']}")
-            if st.button("Supprimer", key=f"del_{i}"):
-                st.session_state.comments.pop(i); sauver_data(DB_FILE, st.session_state.comments); st.rerun()
-            rep = st.text_input("Ta réponse", key=f"rep_{i}")
-            if st.button("Répondre", key=f"b_{i}"):
-                st.session_state.comments[i]['reply'] = rep; sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+    admin_code = st.text_input("Mot de passe admin", type="password")
+    if admin_code == "628316":
+        # On crée une copie pour ne pas perturber la boucle pendant la suppression
+        for i, c in enumerate(list(st.session_state.comments)):
+            col_a1, col_a2 = st.columns([3, 1])
+            with col_a1:
+                st.write(f"**{c['user']}**: {c['msg']}")
+            with col_a2:
+                if st.button("❌ Supprimer", key=f"del_{i}"):
+                    st.session_state.comments.pop(i)
+                    sauver_data(DB_FILE, st.session_state.comments)
+                    st.rerun()
+            
+            # Système de réponse
+            rep = st.text_input("Réponse admin", key=f"rep_txt_{i}")
+            if st.button("🚀 Répondre", key=f"rep_btn_{i}"):
+                st.session_state.comments[i]['reply'] = rep
+                sauver_data(DB_FILE, st.session_state.comments)
+                st.rerun()
+            st.divider()
