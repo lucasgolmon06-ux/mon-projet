@@ -21,17 +21,24 @@ def charger_data(file, default=[]):
 def sauver_data(file, data):
     with open(file, "w", encoding="utf-8") as f: json.dump(data, f, indent=4)
 
-@st.cache_data(ttl=1800) # Mise à jour toutes les 30 minutes
+@st.cache_data(ttl=1800)
 def get_access_token():
     auth_url = f"https://id.twitch.tv/oauth2/token?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&grant_type=client_credentials"
-    res = requests.post(auth_url, verify=False)
-    return res.json().get('access_token')
+    try:
+        res = requests.post(auth_url, verify=False, timeout=10)
+        return res.json().get('access_token')
+    except: return None
 
 def fetch_data(endpoint, query):
     token = get_access_token()
+    if not token: return []
     headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {token}'}
-    res = requests.post(f"https://api.igdb.com/v4/{endpoint}", headers=headers, data=query, verify=False)
-    return res.json()
+    try:
+        res = requests.post(f"https://api.igdb.com/v4/{endpoint}", headers=headers, data=query, verify=False, timeout=10)
+        if res.status_code == 200:
+            return res.json()
+        return []
+    except: return []
 
 # --- 2. INITIALISATION ---
 if 'comments' not in st.session_state: st.session_state.comments = charger_data(DB_FILE)
@@ -46,7 +53,7 @@ st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
     .news-ticker { background: #0072ce; color: white; padding: 12px; font-weight: bold; overflow: hidden; white-space: nowrap; border-radius: 5px; margin-bottom: 20px;}
-    .news-text { display: inline-block; padding-left: 100%; animation: ticker 30s linear infinite; font-size: 1.1rem; }
+    .news-text { display: inline-block; padding-left: 100%; animation: ticker 35s linear infinite; font-size: 1.1rem; }
     @keyframes ticker { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
     .admin-reply { background: #1a1a00; border-left: 5px solid #ffcc00; padding: 10px; margin-left: 30px; border-radius: 8px; color: #ffcc00; margin-top:5px; }
     .badge-admin { background: linear-gradient(45deg, #ffd700, #ff8c00); color: black; padding: 2px 8px; border-radius: 4px; font-weight: bold; margin-right: 10px; }
@@ -70,12 +77,16 @@ if st.session_state.page == "details" and st.session_state.selected_game:
         st.info(g.get('summary', 'Aucun résumé.'))
     st.stop()
 
-# --- 5. RÉCUPÉRATION DES VRAIES NEWS ---
-news_items = fetch_data("website_previews", "fields title; limit 8;")
-news_string = "  //  ".join([n['title'] for n in news_items]) if news_items else "CHARGEMENT DES INFOS GAMING 2026..."
+# --- 5. RÉCUPÉRATION DES NEWS (SÉCURISÉE) ---
+# On utilise l'endpoint 'games' pour simuler des news si website_previews échoue
+news_data = fetch_data("games", "fields name; where total_rating > 90; sort created_at desc; limit 8;")
+if news_data:
+    news_string = "  //  ".join([f"TOP JEU : {n['name']}" for n in news_data])
+else:
+    news_string = "BIENVENUE SUR GAMETREND 2026 - LE CATALOGUE ULTIME DU GAMING"
 
 # --- 6. PAGE ACCUEIL ---
-st.markdown(f'<div class="news-ticker"><div class="news-text">🔥 DERNIÈRES MINUTES : {news_string}</div></div>', unsafe_allow_html=True)
+st.markdown(f'<div class="news-ticker"><div class="news-text">🔥 NEWS : {news_string}</div></div>', unsafe_allow_html=True)
 
 # SECTION DUEL
 st.header("🔥 Le Choc des Titans")
