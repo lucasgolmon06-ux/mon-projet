@@ -46,7 +46,7 @@ st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
     .news-ticker { background: #0072ce; color: white; padding: 12px; font-weight: bold; border-radius: 5px; margin-bottom: 20px;}
-    .top-card { background: rgba(255, 215, 0, 0.1); border: 1px solid #ffd700; border-radius: 10px; padding: 15px; text-align: center; }
+    .top-card { background: rgba(255, 215, 0, 0.1); border: 1px solid #ffd700; border-radius: 10px; padding: 15px; text-align: center; height: 100%; }
     .price-box { background: #28a745; color: white; padding: 10px; border-radius: 5px; font-weight: bold; font-size: 1.2rem; text-align: center; margin-bottom: 10px; }
     .admin-reply { background: #1a1a00; border-left: 5px solid #ffcc00; padding: 10px; margin-left: 30px; border-radius: 8px; color: #ffcc00; margin-top:5px; }
     </style>
@@ -70,21 +70,18 @@ if st.session_state.page == "details" and st.session_state.selected_game:
     
     with c_desc:
         if 'cover' in g: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-        
-        # PRIX DYNAMIQUE
         score = g.get('total_rating', 0)
         prix = "79.99€" if score > 85 else "59.99€" if score > 70 else "29.99€"
-        st.markdown(f'<div class="price-box">PRIX : {prix}</div>', unsafe_allow_html=True)
-        
-        st.metric("SCORE IGDB", f"{int(score)}/100")
+        st.markdown(f'<div class="price-box">PRIX ESTIMÉ : {prix}</div>', unsafe_allow_html=True)
+        st.metric("SCORE CRITIQUE", f"{int(score)}/100")
         st.info(g.get('summary', 'Aucun résumé disponible.'))
     st.stop()
 
 # --- 5. PAGE ACCUEIL ---
-st.markdown('<div class="news-ticker">🚀 GAMETREND 2026 -- LE TOP 3 PS5 ET LES FILTRES SONT EN LIGNE !</div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker">🚀 BIENVENUE SUR GAMETREND 2026 - RECHERCHE ET TOP 3 PS5 ACTIVÉS</div>', unsafe_allow_html=True)
 
-# SECTION DUEL (GTA VI vs CYBERPUNK 2)
-st.header("🔥 Le Choc des Titans")
+# SECTION DUEL
+st.header("🔥 Duel de Légendes")
 col_v1, col_v2 = st.columns(2)
 with col_v1:
     if st.button(f"Voter GTA VI ({st.session_state.vs['j1']})", use_container_width=True):
@@ -94,13 +91,13 @@ with col_v2:
         st.session_state.vs['j2']+=1; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
 
 total_votes = st.session_state.vs['j1'] + st.session_state.vs['j2']
-st.write(f"📊 **Total des participants : {total_votes}**")
-perc = (st.session_state.vs['j1'] / total_votes * 100) if total_votes > 0 else 50
-st.progress(perc/100)
+st.write(f"📊 **Nombre total de votes : {total_votes}**")
+perc = (st.session_state.vs['j1'] / total_votes) if total_votes > 0 else 0.5
+st.progress(perc)
 
-# SECTION VRAI TOP 3 PS5
+# SECTION TOP 3 PS5 RÉEL
 st.divider()
-st.header("🏆 Top 3 des Meilleurs Jeux PS5")
+st.header("🏆 Top 3 des Meilleurs Jeux PS5 (Notes)")
 top_ps5_q = "fields name, cover.url, total_rating; where platforms = (167) & total_rating_count > 50 & cover != null; sort total_rating desc; limit 3;"
 top_games = fetch_data("games", top_ps5_q)
 if top_games:
@@ -111,22 +108,23 @@ if top_games:
             st.image("https:" + tg['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
             st.metric("Score", f"{int(tg.get('total_rating', 0))}/100")
 
-# SECTION CATALOGUE AVEC FILTRES
+# SECTION CATALOGUE & RECHERCHE (CORRIGÉE)
 st.divider()
-st.header("🔍 Catalogue & Recherche")
+st.header("🔍 Catalogue & Filtres")
 f_col1, f_col2, f_col3 = st.columns([2, 1, 1])
-with f_col1: user_search = st.text_input("Rechercher un jeu :")
+with f_col1: user_search = st.text_input("Rechercher un titre...")
 with f_col2: platform_choice = st.selectbox("Console :", ["Toutes", "PS5", "Xbox Series X", "Switch", "PC"])
 with f_col3: genre_choice = st.selectbox("Genre :", ["Tous", "Action", "RPG", "Sport", "Aventure", "Shooter"])
 
-# Mapping IDs IGDB
 plats_map = {"PS5": 167, "Xbox Series X": 169, "Switch": 130, "PC": 6}
 genres_map = {"Action": 31, "RPG": 12, "Sport": 14, "Aventure": 31, "Shooter": 5}
 
-q = "fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null"
 if user_search:
-    q = f'search "{user_search}"; ' + q
+    # Recherche prioritaire
+    q = f'search "{user_search}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
 else:
+    # Navigation par filtres
+    q = "fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null"
     if platform_choice != "Toutes": q += f" & platforms = ({plats_map[platform_choice]})"
     if genre_choice != "Tous": q += f" & genres = ({genres_map[genre_choice]})"
     q += "; sort popularity desc;"
@@ -136,19 +134,22 @@ if games:
     grid = st.columns(6)
     for idx, g in enumerate(games):
         with grid[idx%6]:
-            if 'cover' in g: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-            if st.button("Détails", key=f"btn_{g['id']}"):
-                st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
+            if 'cover' in g:
+                st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+                if st.button("Détails", key=f"btn_{g['id']}"):
+                    st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
+            else:
+                st.write(g['name'])
 
 # SECTION CHAT
 st.divider()
 st.header("💬 Le Chat")
 if not st.session_state.user_pseudo:
-    pseudo_in = st.text_input("Ton pseudo pour tchatter :")
-    if st.button("Rejoindre"): st.session_state.user_pseudo = pseudo_in; st.rerun()
+    pseudo_in = st.text_input("Entre un pseudo :")
+    if st.button("Rejoindre le chat"): st.session_state.user_pseudo = pseudo_in; st.rerun()
 else:
-    with st.form("chat_msg", clear_on_submit=True):
-        txt = st.text_input(f"Message de {st.session_state.user_pseudo}")
+    with st.form("chat_form", clear_on_submit=True):
+        txt = st.text_input(f"Message de {st.session_state.user_pseudo} :")
         if st.form_submit_button("Envoyer") and txt:
             if not any(w in txt.lower() for w in BAD_WORDS):
                 st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": txt, "reply": None})
@@ -161,14 +162,14 @@ for c in st.session_state.comments[::-1][:10]:
 
 # SECTION ADMIN
 st.divider()
-with st.expander("🛠️ Administration"):
-    if st.text_input("Code secret", type="password") == "628316":
+with st.expander("🛠️ Administration (Accès réservé)"):
+    if st.text_input("Code Admin", type="password") == "628316":
         for i, c in enumerate(list(st.session_state.comments)):
             col_a1, col_a2 = st.columns([3, 1])
             with col_a1: st.write(f"**{c['user']}**: {c['msg']}")
             with col_a2:
-                if st.button("❌", key=f"del_{i}"):
+                if st.button("Supprimer", key=f"del_{i}"):
                     st.session_state.comments.pop(i); sauver_data(DB_FILE, st.session_state.comments); st.rerun()
-            rep = st.text_input("Répondre", key=f"rep_{i}")
-            if st.button("🚀", key=f"btn_rep_{i}"):
+            rep = st.text_input("Réponse admin", key=f"rep_{i}")
+            if st.button("Répondre", key=f"btn_rep_{i}"):
                 st.session_state.comments[i]['reply'] = rep; sauver_data(DB_FILE, st.session_state.comments); st.rerun()
