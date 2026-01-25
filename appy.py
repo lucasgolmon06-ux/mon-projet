@@ -40,7 +40,7 @@ if 'user_pseudo' not in st.session_state: st.session_state.user_pseudo = None
 if 'page' not in st.session_state: st.session_state.page = "home"
 if 'selected_game' not in st.session_state: st.session_state.selected_game = None
 
-# --- 3. DESIGN & AUDIO ---
+# --- 3. DESIGN & AUDIO (SANS PLUIE) ---
 st.set_page_config(page_title="GameTrend 2026", layout="wide")
 
 st.markdown("""
@@ -56,7 +56,6 @@ st.markdown("""
             width="0" height="0" frameborder="0" allow="autoplay"></iframe>
     
     <audio id="clickSound" src="https://www.soundjay.com/buttons/button-16.mp3" preload="auto"></audio>
-    <audio autoplay loop><source src="https://www.soundjay.com/nature/rain-01.mp3" type="audio/mpeg"></audio>
 
     <script>
     const playClick = () => {
