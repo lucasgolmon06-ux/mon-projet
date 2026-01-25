@@ -21,24 +21,17 @@ def charger_data(file, default=[]):
 def sauver_data(file, data):
     with open(file, "w", encoding="utf-8") as f: json.dump(data, f, indent=4)
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=3600)
 def get_access_token():
     auth_url = f"https://id.twitch.tv/oauth2/token?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&grant_type=client_credentials"
-    try:
-        res = requests.post(auth_url, verify=False, timeout=10)
-        return res.json().get('access_token')
-    except: return None
+    res = requests.post(auth_url)
+    return res.json().get('access_token')
 
 def fetch_data(endpoint, query):
     token = get_access_token()
-    if not token: return []
     headers = {'Client-ID': CLIENT_ID, 'Authorization': f'Bearer {token}'}
-    try:
-        res = requests.post(f"https://api.igdb.com/v4/{endpoint}", headers=headers, data=query, verify=False, timeout=10)
-        if res.status_code == 200:
-            return res.json()
-        return []
-    except: return []
+    res = requests.post(f"https://api.igdb.com/v4/{endpoint}", headers=headers, data=query)
+    return res.json()
 
 # --- 2. INITIALISATION ---
 if 'comments' not in st.session_state: st.session_state.comments = charger_data(DB_FILE)
@@ -52,9 +45,7 @@ st.set_page_config(page_title="GameTrend 2026", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
-    .news-ticker { background: #0072ce; color: white; padding: 12px; font-weight: bold; overflow: hidden; white-space: nowrap; border-radius: 5px; margin-bottom: 20px;}
-    .news-text { display: inline-block; padding-left: 100%; animation: ticker 35s linear infinite; font-size: 1.1rem; }
-    @keyframes ticker { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
+    .news-ticker { background: #0072ce; color: white; padding: 12px; font-weight: bold; border-radius: 5px; margin-bottom: 20px;}
     .admin-reply { background: #1a1a00; border-left: 5px solid #ffcc00; padding: 10px; margin-left: 30px; border-radius: 8px; color: #ffcc00; margin-top:5px; }
     .badge-admin { background: linear-gradient(45deg, #ffd700, #ff8c00); color: black; padding: 2px 8px; border-radius: 4px; font-weight: bold; margin-right: 10px; }
     </style>
@@ -65,28 +56,27 @@ if st.session_state.page == "details" and st.session_state.selected_game:
     g = st.session_state.selected_game
     if st.button("⬅️ RETOUR À L'ACCUEIL"):
         st.session_state.page = "home"; st.rerun()
+    
     st.title(f"🎮 {g['name']}")
     c_vid, c_desc = st.columns([2, 1])
+    
     with c_vid:
-        if 'videos' in g: st.video(f"https://www.youtube.com/watch?v={g['videos'][0]['video_id']}")
+        if 'videos' in g:
+            st.subheader("📺 Trailer Officiel")
+            st.video(f"https://www.youtube.com/watch?v={g['videos'][0]['video_id']}")
         if 'screenshots' in g:
-            for ss in g['screenshots'][:3]: st.image("https:" + ss['url'].replace('t_thumb', 't_720p'), use_container_width=True)
+            st.subheader("📸 Captures de Gameplay")
+            for ss in g['screenshots'][:3]:
+                st.image("https:" + ss['url'].replace('t_thumb', 't_720p'), use_container_width=True)
+    
     with c_desc:
         if 'cover' in g: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
         st.metric("SCORE IGDB", f"{int(g.get('total_rating', 0))}/100")
         st.info(g.get('summary', 'Aucun résumé.'))
     st.stop()
 
-# --- 5. RÉCUPÉRATION DES NEWS (SÉCURISÉE) ---
-# On utilise l'endpoint 'games' pour simuler des news si website_previews échoue
-news_data = fetch_data("games", "fields name; where total_rating > 90; sort created_at desc; limit 8;")
-if news_data:
-    news_string = "  //  ".join([f"TOP JEU : {n['name']}" for n in news_data])
-else:
-    news_string = "BIENVENUE SUR GAMETREND 2026 - LE CATALOGUE ULTIME DU GAMING"
-
-# --- 6. PAGE ACCUEIL ---
-st.markdown(f'<div class="news-ticker"><div class="news-text">🔥 NEWS : {news_string}</div></div>', unsafe_allow_html=True)
+# --- 5. PAGE ACCUEIL ---
+st.markdown('<div class="news-ticker">🚀 GAMETREND 2026 -- RECHERCHEZ VOS JEUX -- GTA VI vs CYBERPUNK 2 -- VOTEZ MAINTENANT !</div>', unsafe_allow_html=True)
 
 # SECTION DUEL
 st.header("🔥 Le Choc des Titans")
@@ -122,10 +112,11 @@ for c in st.session_state.comments[::-1]:
     if c.get('reply'):
         st.markdown(f"<div class='admin-reply'><span class='badge-admin'>ADMIN</span>{c['reply']}</div>", unsafe_allow_html=True)
 
-# --- 7. CATALOGUE ---
+# --- 6. CATALOGUE & BARRE DE RECHERCHE ---
 st.divider()
 st.header("🔍 Catalogue & Recherche")
-user_search = st.text_input("Tape ici pour chercher un jeu précisément :", placeholder="Ex: FIFA 26...")
+user_search = st.text_input("Tape ici pour chercher un jeu précisément :", placeholder="Ex: FIFA 26, Elden Ring, Mario...")
+
 if user_search:
     q = f'search "{user_search}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
 else:
@@ -142,18 +133,26 @@ if games:
             if st.button("Détails", key=f"btn_{g['id']}"):
                 st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
 
-# --- 8. ADMIN ---
+# --- 7. ADMIN (FIXED) ---
 st.divider()
 with st.expander("🛠️ Administration"):
     admin_code = st.text_input("Mot de passe admin", type="password")
     if admin_code == "628316":
+        # On crée une copie pour ne pas perturber la boucle pendant la suppression
         for i, c in enumerate(list(st.session_state.comments)):
             col_a1, col_a2 = st.columns([3, 1])
-            with col_a1: st.write(f"**{c['user']}**: {c['msg']}")
+            with col_a1:
+                st.write(f"**{c['user']}**: {c['msg']}")
             with col_a2:
                 if st.button("❌ Supprimer", key=f"del_{i}"):
-                    st.session_state.comments.pop(i); sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+                    st.session_state.comments.pop(i)
+                    sauver_data(DB_FILE, st.session_state.comments)
+                    st.rerun()
+            
+            # Système de réponse
             rep = st.text_input("Réponse admin", key=f"rep_txt_{i}")
             if st.button("🚀 Répondre", key=f"rep_btn_{i}"):
-                st.session_state.comments[i]['reply'] = rep; sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+                st.session_state.comments[i]['reply'] = rep
+                sauver_data(DB_FILE, st.session_state.comments)
+                st.rerun()
             st.divider()
