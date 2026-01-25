@@ -22,10 +22,16 @@ def charger_data(file, default=[]):
 def sauver_data(file, data):
     with open(file, "w", encoding="utf-8") as f: json.dump(data, f, indent=4)
 
-# --- INITIALISATION DES FICHIERS ---
-if not os.path.exists(DB_FILE): sauver_data(DB_FILE, [])
-# Pour forcer le reset à 0 maintenant, tu peux changer momentanément la ligne suivante par : 
-# st.session_state.vs = {"j1": 0, "j2": 0} puis relancer une fois.
+def traduire_en_fr(texte):
+    """Fonction de traduction simple via MyMemory API"""
+    if not texte or texte == 'Aucun résumé disponible.': return texte
+    try:
+        url = f"https://api.mymemory.translated.net/get?q={urllib.parse.quote(texte[:500])}&langpair=en|fr"
+        res = requests.get(url).json()
+        return res['responseData']['translatedText']
+    except:
+        return texte
+
 if not os.path.exists(VERSUS_FILE): sauver_data(VERSUS_FILE, {"j1": 0, "j2": 0})
 
 @st.cache_data(ttl=3600)
@@ -61,6 +67,7 @@ st.markdown("""
         display: block; width: 100%; text-align: center; background-color: #ff9900; color: black !important; 
         padding: 15px; font-weight: bold; text-decoration: none; border-radius: 5px; margin-top: 10px;
     }
+    .vote-perc { font-size: 1.5rem; font-weight: bold; color: #ffd700; text-align: center; }
     </style>
 
     <iframe src="https://www.youtube.com/embed/5qap5aO4i9A?autoplay=1&loop=1&playlist=5qap5aO4i9A" 
@@ -106,14 +113,24 @@ if st.session_state.page == "details" and st.session_state.selected_game:
         
         st.divider()
         st.metric("SCORE CRITIQUE", f"{int(score)}/100")
-        st.info(g.get('summary', 'Aucun résumé disponible.'))
+        
+        # --- DESCRIPTION EN FRANÇAIS ---
+        st.subheader("Résumé")
+        resume_en = g.get('summary', 'Aucun résumé disponible.')
+        resume_fr = traduire_en_fr(resume_en)
+        st.info(resume_fr)
+
     st.stop()
 
 # --- 5. PAGE ACCUEIL ---
-st.markdown('<div class="news-ticker">GAMETREND 2026 -- SYSTEME DE VOTE UNIQUE ACTIVE</div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker">GAMETREND 2026 -- RÉSUMÉS TRADUITS EN FRANÇAIS AUTOMATIQUEMENT</div>', unsafe_allow_html=True)
 
-# SECTION DUEL (REMISE A ZERO)
+# SECTION DUEL 
 st.header("Duel de Legendes")
+
+total_votes = st.session_state.vs['j1'] + st.session_state.vs['j2']
+p1 = int((st.session_state.vs['j1'] / total_votes) * 100) if total_votes > 0 else 50
+p2 = 100 - p1 if total_votes > 0 else 50
 
 col_v1, col_v2 = st.columns(2)
 
@@ -123,20 +140,24 @@ if not st.session_state.already_voted:
             st.session_state.vs['j1']+=1
             sauver_data(VERSUS_FILE, st.session_state.vs)
             st.session_state.already_voted = True
+            st.snow()
             st.rerun()
     with col_v2:
         if st.button(f"Voter CYBERPUNK 2 ({st.session_state.vs['j2']})", key="v_cp", use_container_width=True):
             st.session_state.vs['j2']+=1
             sauver_data(VERSUS_FILE, st.session_state.vs)
             st.session_state.already_voted = True
+            st.balloons()
             st.rerun()
 else:
-    st.success("Votre vote a bien été pris en compte !")
+    st.success("Vote enregistré !")
 
-total_votes = st.session_state.vs['j1'] + st.session_state.vs['j2']
-st.write(f"Votes totaux : {total_votes}")
-perc = (st.session_state.vs['j1'] / total_votes) if total_votes > 0 else 0.5
-st.progress(perc)
+c_p1, c_p2 = st.columns(2)
+c_p1.markdown(f'<div class="vote-perc">GTA VI : {p1}%</div>', unsafe_allow_html=True)
+c_p2.markdown(f'<div class="vote-perc">CYBERPUNK 2 : {p2}%</div>', unsafe_allow_html=True)
+
+st.progress(p1 / 100)
+st.write(f"Nombre total de votants : {total_votes}")
 
 # [SECTION CATALOGUE...]
 st.divider()
@@ -198,19 +219,13 @@ for c in st.session_state.comments[::-1][:10]:
     st.write(f"**{c['user']}** : {c['msg']}")
     if c.get('reply'): st.markdown(f"<div class='admin-reply'><b>ADMIN :</b> {c['reply']}</div>", unsafe_allow_html=True)
 
-# --- SECTION ADMIN AMÉLIORÉE ---
 with st.expander("Admin"):
     pwd = st.text_input("Code Secret", type="password")
     if pwd == "628316":
-        st.warning("Zone de gestion critique")
-        if st.button("🔴 RESET TOUS LES VOTES (REMISE A ZERO)"):
+        if st.button("🔴 RESET TOUS LES VOTES"):
             st.session_state.vs = {"j1": 0, "j2": 0}
             sauver_data(VERSUS_FILE, st.session_state.vs)
-            st.success("Les compteurs sont revenus à zéro !")
             st.rerun()
-        
         for i, c in enumerate(list(st.session_state.comments)):
             if st.button(f"Supprimer message {i}", key=f"del_{i}"):
-                st.session_state.comments.pop(i)
-                sauver_data(DB_FILE, st.session_state.comments)
-                st.rerun()
+                st.session_state.comments.pop(i); sauver_data(DB_FILE, st.session_state.comments); st.rerun()
