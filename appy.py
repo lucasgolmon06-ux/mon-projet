@@ -48,10 +48,9 @@ st.markdown("""
     .buy-button { display: block; width: 100%; text-align: center; background-color: #ff9900; color: black !important; padding: 15px; font-weight: bold; text-decoration: none; border-radius: 5px; margin-top: 10px; }
     .admin-reply { background: rgba(255, 204, 0, 0.1); border-left: 5px solid #ffcc00; padding: 10px; margin-left: 20px; border-radius: 5px; color: #ffcc00; margin-top: 5px; }
     </style>
-    <iframe src="https://www.youtube.com/embed/5qap5aO4i9A?autoplay=1&loop=1&playlist=5qap5aO4i9A" width="0" height="0" frameborder="0" allow="autoplay"></iframe>
 """, unsafe_allow_html=True)
 
-# --- 4. LOGIQUE API ---
+# --- 4. LOGIQUE API IGDB ---
 @st.cache_data(ttl=3600)
 def get_access_token():
     auth_url = f"https://id.twitch.tv/oauth2/token?client_id={CLIENT_ID}&client_secret={CLIENT_SECRET}&grant_type=client_credentials"
@@ -75,72 +74,79 @@ if st.session_state.page == "details" and st.session_state.selected_game:
         elif 'screenshots' in g: st.image("https:" + g['screenshots'][0]['url'].replace('t_thumb', 't_720p'))
     with c2:
         if 'cover' in g: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'))
-        st.markdown('<div class="price-box">EN STOCK</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="price-box">PRIX ESTIMÉ : 59.99€</div>', unsafe_allow_html=True)
         url_amz = f"https://www.amazon.fr/s?k={urllib.parse.quote(g['name'] + ' jeu vidéo')}"
         st.markdown(f'<a href="{url_amz}" target="_blank" class="buy-button">ACHETER SUR AMAZON</a>', unsafe_allow_html=True)
         st.info(traduire_en_fr(g.get('summary', 'Pas de résumé.')))
     st.stop()
 
 # --- PAGE ACCUEIL ---
-st.markdown('<div class="news-ticker">GAMETREND 2026 -- MODE ADMIN OPÉRATIONNEL</div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker">GAMETREND 2026 -- CHAT ET VOTES LIVE</div>', unsafe_allow_html=True)
 
 # DUEL
 st.header("Duel de Légendes")
-total_votes = st.session_state.vs['j1'] + st.session_state.vs['j2']
-p1 = int((st.session_state.vs['j1'] / total_votes) * 100) if total_votes > 0 else 50
+total = st.session_state.vs['j1'] + st.session_state.vs['j2']
 col_v1, col_v2 = st.columns(2)
 if not st.session_state.already_voted:
     if col_v1.button(f"GTA VI ({st.session_state.vs['j1']})", use_container_width=True):
         st.session_state.vs['j1']+=1; sauver_data(VERSUS_FILE, st.session_state.vs); st.session_state.already_voted=True; st.snow(); st.rerun()
     if col_v2.button(f"CYBERPUNK 2 ({st.session_state.vs['j2']})", use_container_width=True):
         st.session_state.vs['j2']+=1; sauver_data(VERSUS_FILE, st.session_state.vs); st.session_state.already_voted=True; st.balloons(); st.rerun()
-else: st.success(f"GTA VI: {p1}% | Cyberpunk: {100-p1}%")
+else: st.success("Merci d'avoir voté !")
 
-# CATALOGUE
+# CATALOGUE (Simplifié pour l'exemple)
 st.divider()
+st.header("Jeux du Moment")
 games = fetch_data("games", "fields name, cover.url, summary, videos.video_id, screenshots.url; limit 6; where cover != null; sort popularity desc;")
 if games:
     cols = st.columns(6)
     for i, g in enumerate(games):
         with cols[i]:
             st.image("https:" + g['cover']['url'])
-            if st.button("Détails", key=f"btn_h_{g['id']}"):
+            if st.button("Détails", key=f"btn_{g['id']}"):
                 st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
 
-# --- CHAT ---
+# --- SECTION CHAT ---
 st.divider()
-st.header("Chat")
+st.header("Chat Communautaire")
 if not st.session_state.user_pseudo:
-    p = st.text_input("Pseudo")
-    if st.button("Rejoindre"): st.session_state.user_pseudo = p; st.rerun()
+    p = st.text_input("Choisis un pseudo pour parler")
+    if st.button("Entrer"): st.session_state.user_pseudo = p; st.rerun()
 else:
-    with st.form("new_msg", clear_on_submit=True):
+    with st.form("msg_form", clear_on_submit=True):
         m = st.text_input(f"{st.session_state.user_pseudo} :")
         if st.form_submit_button("Envoyer") and m:
-            st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m, "reply": None})
-            sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+            if not any(w in m.lower() for w in BAD_WORDS):
+                st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m, "reply": None})
+                sauver_data(DB_FILE, st.session_state.comments); st.rerun()
 
-for c in st.session_state.comments[::-1][:10]:
+# Affichage des messages
+for i, c in enumerate(st.session_state.comments[::-1][:10]):
     st.write(f"**{c['user']}** : {c['msg']}")
-    if c.get('reply'): st.markdown(f'<div class="admin-reply"><b>ADMIN :</b> {c["reply"]}</div>', unsafe_allow_html=True)
+    if c.get('reply'):
+        st.markdown(f'<div class="admin-reply"><b>ADMIN :</b> {c["reply"]}</div>', unsafe_allow_html=True)
 
-# --- ZONE ADMIN ---
-with st.expander("Zone Admin"):
-    if st.text_input("Code", type="password") == "628316":
-        for i, com in enumerate(st.session_state.comments):
-            st.write(f"--- Message de {com['user']} ---")
-            st.write(f"Texte : {com['msg']}")
+# --- SECTION ADMIN (RÉPONSES) ---
+with st.expander("Admin"):
+    if st.text_input("Code Secret", type="password") == "628316":
+        st.write("Gestion des messages :")
+        # On travaille sur une copie inversée pour correspondre à l'affichage
+        msgs = st.session_state.comments
+        for idx, com in enumerate(msgs):
+            col_a, col_b = st.columns([3, 1])
+            col_a.write(f"ID {idx} | {com['user']} : {com['msg']}")
+            if col_b.button("Supprimer", key=f"del_{idx}"):
+                st.session_state.comments.pop(idx)
+                sauver_data(DB_FILE, st.session_state.comments); st.rerun()
             
-            # Formulaire de réponse UNIQUE par message
-            with st.form(key=f"admin_form_{i}"):
-                rep = st.text_input("Ta réponse", value=com.get('reply') or "")
-                c_del, c_rep = st.columns(2)
-                if c_rep.form_submit_button("Publier Réponse"):
-                    st.session_state.comments[i]['reply'] = rep
-                    sauver_data(DB_FILE, st.session_state.comments); st.rerun()
-                if c_del.form_submit_button("Supprimer Message"):
-                    st.session_state.comments.pop(i)
-                    sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+            # Formulaire de réponse pour chaque message
+            with st.form(key=f"rep_form_{idx}"):
+                rep_text = st.text_input("Ta réponse admin :")
+                if st.form_submit_button("Répondre"):
+                    st.session_state.comments[idx]['reply'] = rep_text
+                    sauver_data(DB_FILE, st.session_state.comments)
+                    st.success("Réponse envoyée !"); st.rerun()
         
         if st.button("RESET TOUS LES VOTES"):
-            st.session_state.vs = {"j1": 0, "j2": 0}; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
+            st.session_state.vs = {"j1": 0, "j2": 0}
+            sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
