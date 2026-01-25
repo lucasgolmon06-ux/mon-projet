@@ -1,4 +1,4 @@
-Import streamlit as st
+import streamlit as st
 import requests
 import json
 import os
@@ -150,4 +150,3 @@ with st.expander("🛠️ Administration"):
             rep = st.text_input("Ta réponse", key=f"rep_{i}")
             if st.button("Répondre", key=f"b_{i}"):
                 st.session_state.comments[i]['reply'] = rep; sauver_data(DB_FILE, st.session_state.comments); st.rerun()
-Lui c’est le bon
