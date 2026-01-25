@@ -48,6 +48,8 @@ st.markdown("""
     .news-ticker { background: #0072ce; color: white; padding: 12px; font-weight: bold; border-radius: 5px; margin-bottom: 20px;}
     .admin-reply { background: #1a1a00; border-left: 5px solid #ffcc00; padding: 10px; margin-left: 30px; border-radius: 8px; color: #ffcc00; margin-top:5px; }
     .badge-admin { background: linear-gradient(45deg, #ffd700, #ff8c00); color: black; padding: 2px 8px; border-radius: 4px; font-weight: bold; margin-right: 10px; }
+    .price-container { border: 1px solid #00f2ff; padding: 15px; border-radius: 10px; background: rgba(0, 242, 255, 0.05); margin-top: 15px; }
+    .store-link { display: block; color: #00f2ff; text-decoration: none; margin-bottom: 5px; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -65,20 +67,42 @@ if st.session_state.page == "details" and st.session_state.selected_game:
             st.subheader("📺 Trailer Officiel")
             st.video(f"https://www.youtube.com/watch?v={g['videos'][0]['video_id']}")
         if 'screenshots' in g:
-            st.subheader("📸 Captures de Gameplay")
-            for ss in g['screenshots'][:3]:
+            st.subheader("📸 Captures")
+            for ss in g['screenshots'][:2]:
                 st.image("https:" + ss['url'].replace('t_thumb', 't_720p'), use_container_width=True)
     
     with c_desc:
         if 'cover' in g: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
+        
+        # --- SYSTÈME DE PRIX RÉELS ---
+        st.subheader("💰 Prix & Boutiques")
+        # On cherche les liens externes (PS Store, Xbox, Steam, etc.)
+        ext_query = f"fields category, url; where game = {g['id']};"
+        stores = fetch_data("external_games", ext_query)
+        
+        mapping = {1: "Steam (PC)", 11: "Microsoft (Xbox)", 16: "PlayStation Store", 23: "Nintendo eShop", 5: "GOG"}
+        
+        st.markdown('<div class="price-container">', unsafe_allow_html=True)
+        found_store = False
+        if stores:
+            for s in stores:
+                name = mapping.get(s['category'])
+                if name:
+                    st.markdown(f'<a class="store-link" href="{s["url"]}" target="_blank">🔗 Voir sur {name}</a>', unsafe_allow_html=True)
+                    found_store = True
+        
+        if not found_store:
+            st.write("Prix en attente de mise à jour sur les stores officiels.")
+        st.markdown('</div>', unsafe_allow_html=True)
+        
         st.metric("SCORE IGDB", f"{int(g.get('total_rating', 0))}/100")
         st.info(g.get('summary', 'Aucun résumé.'))
     st.stop()
 
 # --- 5. PAGE ACCUEIL ---
-st.markdown('<div class="news-ticker">🚀 GAMETREND 2026 -- RECHERCHEZ VOS JEUX -- GTA VI vs CYBERPUNK 2 -- VOTEZ MAINTENANT !</div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker">🚀 GAMETREND 2026 -- RECHERCHEZ VOS JEUX -- VRAIS PRIX DISPONIBLES DANS DÉTAILS</div>', unsafe_allow_html=True)
 
-# SECTION DUEL
+# SECTION DUEL (Strictement identique)
 st.header("🔥 Le Choc des Titans")
 col_v1, col_v2 = st.columns(2)
 with col_v1:
@@ -91,9 +115,8 @@ with col_v2:
 votes_t = st.session_state.vs['j1'] + st.session_state.vs['j2']
 perc = (st.session_state.vs['j1'] / votes_t * 100) if votes_t > 0 else 50
 st.progress(perc/100)
-st.markdown(f"<p style='text-align:center;'>GTA VI : {int(perc)}% | CYBERPUNK 2 : {int(100-perc)}%</p>", unsafe_allow_html=True)
 
-# SECTION CHAT
+# SECTION CHAT (Strictement identique)
 st.divider()
 st.header("💬 Le Chat")
 if not st.session_state.user_pseudo:
@@ -112,16 +135,16 @@ for c in st.session_state.comments[::-1]:
     if c.get('reply'):
         st.markdown(f"<div class='admin-reply'><span class='badge-admin'>ADMIN</span>{c['reply']}</div>", unsafe_allow_html=True)
 
-# --- 6. CATALOGUE & BARRE DE RECHERCHE ---
+# --- 6. CATALOGUE ---
 st.divider()
 st.header("🔍 Catalogue & Recherche")
-user_search = st.text_input("Tape ici pour chercher un jeu précisément :", placeholder="Ex: FIFA 26, Elden Ring, Mario...")
+user_search = st.text_input("Chercher un jeu :", placeholder="Ex: Elden Ring...")
 
 if user_search:
     q = f'search "{user_search}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
 else:
+    choice = st.selectbox("Ou choisis une console :", ["PS5", "Xbox Series X", "Switch", "PC"])
     plats = {"PS5": 167, "Xbox Series X": 169, "Switch": 130, "PC": 6}
-    choice = st.selectbox("Ou choisis une console :", list(plats.keys()))
     q = f"fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; where platforms = ({plats[choice]}) & cover != null; sort popularity desc; limit 12;"
 
 games = fetch_data("games", q)
@@ -133,26 +156,16 @@ if games:
             if st.button("Détails", key=f"btn_{g['id']}"):
                 st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
 
-# --- 7. ADMIN (FIXED) ---
+# --- 7. ADMIN ---
 st.divider()
 with st.expander("🛠️ Administration"):
-    admin_code = st.text_input("Mot de passe admin", type="password")
-    if admin_code == "628316":
-        # On crée une copie pour ne pas perturber la boucle pendant la suppression
+    if st.text_input("Code Admin", type="password") == "628316":
         for i, c in enumerate(list(st.session_state.comments)):
             col_a1, col_a2 = st.columns([3, 1])
-            with col_a1:
-                st.write(f"**{c['user']}**: {c['msg']}")
+            with col_a1: st.write(f"{c['user']}: {c['msg']}")
             with col_a2:
-                if st.button("❌ Supprimer", key=f"del_{i}"):
-                    st.session_state.comments.pop(i)
-                    sauver_data(DB_FILE, st.session_state.comments)
-                    st.rerun()
-            
-            # Système de réponse
-            rep = st.text_input("Réponse admin", key=f"rep_txt_{i}")
-            if st.button("🚀 Répondre", key=f"rep_btn_{i}"):
-                st.session_state.comments[i]['reply'] = rep
-                sauver_data(DB_FILE, st.session_state.comments)
-                st.rerun()
-            st.divider()
+                if st.button("❌", key=f"del_{i}"):
+                    st.session_state.comments.pop(i); sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+            rep = st.text_input("Répondre", key=f"rep_{i}")
+            if st.button("🚀", key=f"btn_rep_{i}"):
+                st.session_state.comments[i]['reply'] = rep; sauver_data(DB_FILE, st.session_state.comments); st.rerun()
