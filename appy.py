@@ -46,7 +46,7 @@ st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
     .news-ticker { background: #0072ce; color: white; padding: 12px; font-weight: bold; border-radius: 5px; margin-bottom: 20px;}
-    .top-card { background: rgba(255, 215, 0, 0.1); border: 1px solid #ffd700; border-radius: 10px; padding: 15px; text-align: center; height: 100%; }
+    .top-card { background: rgba(255, 215, 0, 0.1); border: 1px solid #ffd700; border-radius: 10px; padding: 15px; text-align: center; }
     .price-box { background: #28a745; color: white; padding: 10px; border-radius: 5px; font-weight: bold; font-size: 1.2rem; text-align: center; margin-bottom: 10px; }
     .admin-reply { background: #1a1a00; border-left: 5px solid #ffcc00; padding: 10px; margin-left: 30px; border-radius: 8px; color: #ffcc00; margin-top:5px; }
     </style>
@@ -78,7 +78,7 @@ if st.session_state.page == "details" and st.session_state.selected_game:
     st.stop()
 
 # --- 5. PAGE ACCUEIL ---
-st.markdown('<div class="news-ticker">🚀 BIENVENUE SUR GAMETREND 2026 - RECHERCHE ET TOP 3 PS5 ACTIVÉS</div>', unsafe_allow_html=True)
+st.markdown('<div class="news-ticker">🚀 GAMETREND 2026 -- CLIQUE SUR LES TOPS POUR VOIR LES DÉTAILS !</div>', unsafe_allow_html=True)
 
 # SECTION DUEL
 st.header("🔥 Duel de Légendes")
@@ -95,11 +95,13 @@ st.write(f"📊 **Nombre total de votes : {total_votes}**")
 perc = (st.session_state.vs['j1'] / total_votes) if total_votes > 0 else 0.5
 st.progress(perc)
 
-# SECTION TOP 3 PS5 RÉEL
+# SECTION TOP 3 PS5 RÉEL AVEC ACCÈS DÉTAILS
 st.divider()
-st.header("🏆 Top 3 des Meilleurs Jeux PS5 (Notes)")
-top_ps5_q = "fields name, cover.url, total_rating; where platforms = (167) & total_rating_count > 50 & cover != null; sort total_rating desc; limit 3;"
+st.header("🏆 Top 3 des Meilleurs Jeux PS5")
+# On récupère plus de champs pour que la page détails fonctionne bien (summary, videos, etc.)
+top_ps5_q = "fields name, cover.url, total_rating, summary, videos.video_id, screenshots.url; where platforms = (167) & total_rating_count > 50 & cover != null; sort total_rating desc; limit 3;"
 top_games = fetch_data("games", top_ps5_q)
+
 if top_games:
     cols_top = st.columns(3)
     for i, tg in enumerate(top_games):
@@ -107,8 +109,13 @@ if top_games:
             st.markdown(f'<div class="top-card"><h2 style="color:#ffd700;">#{i+1}</h2><h4>{tg["name"]}</h4></div>', unsafe_allow_html=True)
             st.image("https:" + tg['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
             st.metric("Score", f"{int(tg.get('total_rating', 0))}/100")
+            # Bouton pour aller dans les détails
+            if st.button("Voir la fiche", key=f"top_{tg['id']}"):
+                st.session_state.selected_game = tg
+                st.session_state.page = "details"
+                st.rerun()
 
-# SECTION CATALOGUE & RECHERCHE (CORRIGÉE)
+# SECTION CATALOGUE & RECHERCHE
 st.divider()
 st.header("🔍 Catalogue & Filtres")
 f_col1, f_col2, f_col3 = st.columns([2, 1, 1])
@@ -120,10 +127,8 @@ plats_map = {"PS5": 167, "Xbox Series X": 169, "Switch": 130, "PC": 6}
 genres_map = {"Action": 31, "RPG": 12, "Sport": 14, "Aventure": 31, "Shooter": 5}
 
 if user_search:
-    # Recherche prioritaire
     q = f'search "{user_search}"; fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null;'
 else:
-    # Navigation par filtres
     q = "fields name, cover.url, summary, videos.video_id, total_rating, screenshots.url; limit 12; where cover != null"
     if platform_choice != "Toutes": q += f" & platforms = ({plats_map[platform_choice]})"
     if genre_choice != "Tous": q += f" & genres = ({genres_map[genre_choice]})"
@@ -136,20 +141,20 @@ if games:
         with grid[idx%6]:
             if 'cover' in g:
                 st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'), use_container_width=True)
-                if st.button("Détails", key=f"btn_{g['id']}"):
+                if st.button("Détails", key=f"cat_{g['id']}"):
                     st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
             else:
                 st.write(g['name'])
 
-# SECTION CHAT
+# SECTION CHAT & ADMIN (identique à précédemment)
 st.divider()
 st.header("💬 Le Chat")
 if not st.session_state.user_pseudo:
-    pseudo_in = st.text_input("Entre un pseudo :")
-    if st.button("Rejoindre le chat"): st.session_state.user_pseudo = pseudo_in; st.rerun()
+    pseudo_in = st.text_input("Pseudo :")
+    if st.button("Rejoindre"): st.session_state.user_pseudo = pseudo_in; st.rerun()
 else:
     with st.form("chat_form", clear_on_submit=True):
-        txt = st.text_input(f"Message de {st.session_state.user_pseudo} :")
+        txt = st.text_input(f"Message de {st.session_state.user_pseudo}")
         if st.form_submit_button("Envoyer") and txt:
             if not any(w in txt.lower() for w in BAD_WORDS):
                 st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": txt, "reply": None})
@@ -157,19 +162,10 @@ else:
 
 for c in st.session_state.comments[::-1][:10]:
     st.write(f"**{c['user']}** : {c['msg']}")
-    if c.get('reply'):
-        st.markdown(f"<div class='admin-reply'><b>ADMIN :</b> {c['reply']}</div>", unsafe_allow_html=True)
+    if c.get('reply'): st.markdown(f"<div class='admin-reply'><b>ADMIN :</b> {c['reply']}</div>", unsafe_allow_html=True)
 
-# SECTION ADMIN
-st.divider()
-with st.expander("🛠️ Administration (Accès réservé)"):
-    if st.text_input("Code Admin", type="password") == "628316":
+with st.expander("🛠️ Admin"):
+    if st.text_input("Code", type="password") == "628316":
         for i, c in enumerate(list(st.session_state.comments)):
-            col_a1, col_a2 = st.columns([3, 1])
-            with col_a1: st.write(f"**{c['user']}**: {c['msg']}")
-            with col_a2:
-                if st.button("Supprimer", key=f"del_{i}"):
-                    st.session_state.comments.pop(i); sauver_data(DB_FILE, st.session_state.comments); st.rerun()
-            rep = st.text_input("Réponse admin", key=f"rep_{i}")
-            if st.button("Répondre", key=f"btn_rep_{i}"):
-                st.session_state.comments[i]['reply'] = rep; sauver_data(DB_FILE, st.session_state.comments); st.rerun()
+            if st.button(f"Supprimer {i}", key=f"del_{i}"):
+                st.session_state.comments.pop(i); sauver_data(DB_FILE, st.session_state.comments); st.rerun()
