@@ -10,7 +10,13 @@ CLIENT_SECRET = 'n0i3u05gs9gmknoho2sed9q3vfn1y3'
 DB_FILE = "data_comms.json"
 VERSUS_FILE = "versus_stats.json"
 
-BAD_WORDS = ["merde", "connard", "fdp", "salope", "pute", "encule", "con"]
+AVATARS = {
+    "🎮 Joueur PS5": "🟦",
+    "🎮 Joueur Xbox": "🟩",
+    "🎮 Joueur Switch": "🟥",
+    "💻 PC Master Race": "💻",
+    "🕹️ Rétro Gamer": "👾"
+}
 
 def charger_data(file, default=[]):
     if os.path.exists(file):
@@ -34,35 +40,24 @@ def traduire_en_fr(texte):
 if 'comments' not in st.session_state: st.session_state.comments = charger_data(DB_FILE)
 if 'vs' not in st.session_state: st.session_state.vs = charger_data(VERSUS_FILE, {"j1": 0, "j2": 0})
 if 'user_pseudo' not in st.session_state: st.session_state.user_pseudo = None
+if 'user_avatar' not in st.session_state: st.session_state.user_avatar = "🟦"
 if 'page' not in st.session_state: st.session_state.page = "home"
 if 'selected_game' not in st.session_state: st.session_state.selected_game = None
 if 'already_voted' not in st.session_state: st.session_state.already_voted = False
 
-# --- 3. DESIGN & ANIMATIONS CSS ---
+# --- 3. DESIGN ---
 st.set_page_config(page_title="GameTrend 2026", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #00051d; color: white; }
-    
-    /* Bandeau défilant */
-    .ticker-wrap {
-        width: 100%; overflow: hidden; background: #0072ce; 
-        padding: 10px 0; border-radius: 5px; margin-bottom: 25px;
-    }
-    .ticker {
-        display: inline-block; white-space: nowrap; padding-right: 100%;
-        animation: ticker 20s linear infinite; font-weight: bold; font-size: 1.2rem;
-    }
-    @keyframes ticker {
-        0% { transform: translate3d(100%, 0, 0); }
-        100% { transform: translate3d(-100%, 0, 0); }
-    }
-
+    .ticker-wrap { width: 100%; overflow: hidden; background: #0072ce; padding: 10px 0; border-radius: 5px; margin-bottom: 25px; }
+    .ticker { display: inline-block; white-space: nowrap; padding-right: 100%; animation: ticker 20s linear infinite; font-weight: bold; font-size: 1.2rem; }
+    @keyframes ticker { 0% { transform: translate3d(100%, 0, 0); } 100% { transform: translate3d(-100%, 0, 0); } }
     .price-box { background: #28a745; color: white; padding: 10px; border-radius: 5px; font-weight: bold; text-align: center; }
     .buy-button { display: block; width: 100%; text-align: center; background-color: #ff9900; color: black !important; padding: 15px; font-weight: bold; text-decoration: none; border-radius: 5px; margin-top: 10px; }
     .admin-reply { background: rgba(255, 204, 0, 0.1); border-left: 5px solid #ffcc00; padding: 10px; margin-left: 20px; border-radius: 5px; color: #ffcc00; margin-top: 5px; }
+    .chat-msg { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin-bottom: 5px; border: 1px solid rgba(255,255,255,0.1); }
     </style>
-    
     <iframe src="https://www.youtube.com/embed/5qap5aO4i9A?autoplay=1&loop=1&playlist=5qap5aO4i9A" width="0" height="0" frameborder="0" allow="autoplay"></iframe>
 """, unsafe_allow_html=True)
 
@@ -82,7 +77,7 @@ def fetch_data(endpoint, query):
 # --- PAGE DÉTAILS ---
 if st.session_state.page == "details" and st.session_state.selected_game:
     g = st.session_state.selected_game
-    if st.button("RETOUR"): st.session_state.page = "home"; st.rerun()
+    if st.button("⬅️ RETOUR"): st.session_state.page = "home"; st.rerun()
     st.title(g['name'])
     c1, c2 = st.columns([2, 1])
     with c1:
@@ -90,69 +85,78 @@ if st.session_state.page == "details" and st.session_state.selected_game:
         elif 'screenshots' in g: st.image("https:" + g['screenshots'][0]['url'].replace('t_thumb', 't_720p'))
     with c2:
         if 'cover' in g: st.image("https:" + g['cover']['url'].replace('t_thumb', 't_cover_big'))
-        st.markdown('<div class="price-box">DISPONIBLE</div>', unsafe_allow_html=True)
+        st.markdown('<div class="price-box">DISPONIBLE MAINTENANT</div>', unsafe_allow_html=True)
         url_amz = f"https://www.amazon.fr/s?k={urllib.parse.quote(g['name'] + ' jeu vidéo')}"
         st.markdown(f'<a href="{url_amz}" target="_blank" class="buy-button">ACHETER SUR AMAZON</a>', unsafe_allow_html=True)
         st.info(traduire_en_fr(g.get('summary', 'Pas de résumé.')))
     st.stop()
 
 # --- PAGE ACCUEIL ---
-# BANDEAU DÉFILANT
-st.markdown("""
-    <div class="ticker-wrap">
-        <div class="ticker">
-            🚨 DERNIÈRE MINUTE : LE DUEL DE L'ANNÉE EST LANCÉ ! CYBERPUNK 2 vs GTA VI --- VOTEZ MAINTENANT --- LES MEILLEURS PRIX SONT SUR GAMETREND 2026 --- 🚨
-        </div>
-    </div>
-""", unsafe_allow_html=True)
+st.markdown('<div class="ticker-wrap"><div class="ticker">🚨 CYBERPUNK 2 vs GTA VI : LE CHOC DES TITRES --- VOTEZ POUR VOTRE FAVORI --- NOUVEAU SYSTÈME D\'AVATARS DISPONIBLE DANS LE CHAT 🚨</div></div>', unsafe_allow_html=True)
 
 # DUEL
-st.header("Duel de Légendes")
+st.header("🏆 Duel de Légendes")
 total_votes = st.session_state.vs['j1'] + st.session_state.vs['j2']
-p1 = int((st.session_state.vs['j1'] / total_votes) * 100) if total_votes > 0 else 50
 col_v1, col_v2 = st.columns(2)
 if not st.session_state.already_voted:
-    if col_v1.button(f"GTA VI ({st.session_state.vs['j1']})", use_container_width=True):
+    if col_v1.button(f"Voter GTA VI ({st.session_state.vs['j1']})", use_container_width=True):
         st.session_state.vs['j1']+=1; sauver_data(VERSUS_FILE, st.session_state.vs); st.session_state.already_voted=True; st.snow(); st.rerun()
-    if col_v2.button(f"CYBERPUNK 2 ({st.session_state.vs['j2']})", use_container_width=True):
+    if col_v2.button(f"Voter CYBERPUNK 2 ({st.session_state.vs['j2']})", use_container_width=True):
         st.session_state.vs['j2']+=1; sauver_data(VERSUS_FILE, st.session_state.vs); st.session_state.already_voted=True; st.balloons(); st.rerun()
-else: st.success(f"RÉSULTATS : GTA VI {p1}% | CYBERPUNK 2 {100-p1}%")
+else:
+    p1 = int((st.session_state.vs['j1'] / total_votes) * 100) if total_votes > 0 else 50
+    st.success(f"Résultats actuels : GTA VI {p1}% | Cyberpunk 2 {100-p1}%")
 
 # CATALOGUE
 st.divider()
+st.subheader("🔥 Jeux Tendances")
 games = fetch_data("games", "fields name, cover.url, summary, videos.video_id, screenshots.url; limit 6; where cover != null; sort popularity desc;")
 if games:
     cols = st.columns(6)
     for i, g in enumerate(games):
         with cols[i]:
-            st.image("https:" + g['cover']['url'])
+            st.image("https:" + g['cover']['url'], use_container_width=True)
             if st.button("Détails", key=f"btn_h_{g['id']}"):
                 st.session_state.selected_game = g; st.session_state.page = "details"; st.rerun()
 
-# --- CHAT ---
+# --- CHAT AVEC AVATARS ---
 st.divider()
-st.header("Chat")
+st.header("💬 Chat des Gamers")
 if not st.session_state.user_pseudo:
-    p = st.text_input("Pseudo")
-    if st.button("Rejoindre"): st.session_state.user_pseudo = p; st.rerun()
+    c_p1, c_p2 = st.columns(2)
+    p = c_p1.text_input("Choisis ton Pseudo")
+    a = c_p2.selectbox("Choisis ton Camp / Console", list(AVATARS.keys()))
+    if st.button("Rejoindre la communauté"):
+        if p:
+            st.session_state.user_pseudo = p
+            st.session_state.user_avatar = AVATARS[a]
+            st.rerun()
 else:
     with st.form("new_msg", clear_on_submit=True):
-        m = st.text_input(f"{st.session_state.user_pseudo} :")
+        m = st.text_input(f"{st.session_state.user_avatar} {st.session_state.user_pseudo} :")
         if st.form_submit_button("Envoyer") and m:
-            st.session_state.comments.append({"user": st.session_state.user_pseudo, "msg": m, "reply": None})
+            st.session_state.comments.append({
+                "user": st.session_state.user_pseudo, 
+                "avatar": st.session_state.user_avatar, 
+                "msg": m, 
+                "reply": None
+            })
             sauver_data(DB_FILE, st.session_state.comments); st.rerun()
 
-for c in st.session_state.comments[::-1][:10]:
-    st.write(f"**{c['user']}** : {c['msg']}")
-    if c.get('reply'): st.markdown(f'<div class="admin-reply"><b>ADMIN :</b> {c["reply"]}</div>', unsafe_allow_html=True)
+# Affichage des messages avec style
+for c in st.session_state.comments[::-1][:12]:
+    avatar = c.get('avatar', '👤')
+    st.markdown(f"""<div class="chat-msg"><b>{avatar} {c['user']}</b> : {c['msg']}</div>""", unsafe_allow_html=True)
+    if c.get('reply'):
+        st.markdown(f'<div class="admin-reply"><b>⚡ ADMIN :</b> {c["reply"]}</div>', unsafe_allow_html=True)
 
 # --- ZONE ADMIN ---
-with st.expander("Zone Admin"):
-    if st.text_input("Code", type="password") == "628316":
+with st.expander("🔐 Administration"):
+    if st.text_input("Code Secret Admin", type="password") == "628316":
         for i, com in enumerate(st.session_state.comments):
-            st.write(f"--- Message de {com['user']} ---")
+            st.write(f"Message de {com['user']}")
             with st.form(key=f"admin_form_{i}"):
-                rep = st.text_input("Réponse Admin", value=com.get('reply') or "")
+                rep = st.text_input("Réponse", value=com.get('reply') or "")
                 c_del, c_rep = st.columns(2)
                 if c_rep.form_submit_button("Répondre"):
                     st.session_state.comments[i]['reply'] = rep
@@ -160,6 +164,3 @@ with st.expander("Zone Admin"):
                 if c_del.form_submit_button("Supprimer"):
                     st.session_state.comments.pop(i)
                     sauver_data(DB_FILE, st.session_state.comments); st.rerun()
-        
-        if st.button("RESET TOUS LES VOTES"):
-            st.session_state.vs = {"j1": 0, "j2": 0}; sauver_data(VERSUS_FILE, st.session_state.vs); st.rerun()
